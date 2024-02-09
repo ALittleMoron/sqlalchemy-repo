@@ -1,0 +1,30 @@
+{
+  "cSpell.words": [
+    "abstractcp",
+    "addoption",
+    "clsregistry",
+    "fuxture",
+    "ilike",
+    "isodow",
+    "isouter",
+    "isoyear",
+    "joinedload",
+    "Onclause",
+    "Pydantic",
+    "selectinload",
+    "sessionmaker",
+    "sqlalchemy",
+    "sqlrepo",
+    "subqueryload"
+  ],
+  "coverage-gutters.coverageFileNames": [
+    "lcov.info",
+    "cov.xml",
+    "coverage.xml",
+    "jacoco.xml",
+    "coverage.cobertura.xml"
+  ],
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
+}
