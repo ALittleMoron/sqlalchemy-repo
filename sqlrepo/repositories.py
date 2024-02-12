@@ -17,7 +17,7 @@ from typing import (
 from sqlalchemy.orm import DeclarativeBase as Base
 from sqlalchemy.orm import joinedload
 
-from sqlrepo import exceptions as sqlrepo_exc
+from sqlrepo import exc as sqlrepo_exc
 from sqlrepo.filters.converters import (
     AdvancedOperatorFilterConverter,
     BaseFilterConverter,

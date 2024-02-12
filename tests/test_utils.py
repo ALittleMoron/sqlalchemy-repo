@@ -8,6 +8,7 @@ from sqlalchemy import delete, insert, inspect, select, update
 from sqlalchemy.orm import joinedload, selectinload, subqueryload
 
 from sqlrepo import utils
+from sqlrepo.exc import NoModelFieldError
 from tests.utils import Base, MyModel, OtherModel, generate_datetime_list
 
 
@@ -29,8 +30,13 @@ def test_get_utc_now(dt: datetime.datetime) -> None:  # noqa
         ('get_full_name', MyModel.get_full_name()),
     ],
 )
-def test_get_sqlalchemy_field(field: str, expected_result: Any) -> None:  # noqa
-    assert str(utils.get_sqlalchemy_field(MyModel, field)) == str(expected_result)
+def test_get_sqlalchemy_attribute(field: str, expected_result: Any) -> None:  # noqa
+    assert str(utils.get_sqlalchemy_attribute(MyModel, field)) == str(expected_result)
+
+
+def test_get_sqlalchemy_attribute_incorrect() -> None:  # noqa
+    with pytest.raises(NoModelFieldError):
+        utils.get_sqlalchemy_attribute(MyModel, 'incorrect_field')
 
 
 @pytest.mark.parametrize(

@@ -2,13 +2,14 @@ import datetime
 import re
 from typing import TYPE_CHECKING, Any, Callable, Literal, NotRequired, TypedDict, TypeVar
 
-from sqlalchemy import CursorResult, and_, delete, func, or_, select, update
+from sqlalchemy import CursorResult, and_, delete
 from sqlalchemy import exc as sqlalchemy_exc
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from sqlrepo.filters.converters import BaseFilterConverter
 from sqlrepo.logging import logger
-from sqlrepo.utils import apply_joins, apply_loads, get_sqlalchemy_field, get_utc_now
+from sqlrepo.utils import apply_joins, apply_loads, get_sqlalchemy_attribute, get_utc_now
 
 
 class JoinKwargs(TypedDict):
@@ -153,7 +154,7 @@ class BaseQuery:
         search_by_args = self._resolve_specific_columns(elements=search_by_args)  # type: ignore
         for search_by in search_by_args:
             if isinstance(search_by, str):
-                column = get_sqlalchemy_field(model, search_by)
+                column = get_sqlalchemy_attribute(model, search_by)
                 clause = column.ilike(f'%{search}%')
                 filters.append(clause)
             else:

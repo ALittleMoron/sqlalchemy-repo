@@ -1,5 +1,7 @@
 .coverage
-.coverage.xml
+coverage.xml
 rules.txt
 .vscode
+.ruff_cache
+__pycache__
 .ruff_cache

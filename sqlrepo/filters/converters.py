@@ -8,10 +8,10 @@ from abstractcp import Abstract, abstract_class_property
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.sql.elements import ColumnElement
 
-from sqlrepo.exceptions import FilterError
+from sqlrepo.exc import FilterError
 from sqlrepo.filters import operators as custom_operator
 from sqlrepo.filters.guards import is_dict_simple_filter_dict
-from sqlrepo.utils import get_sqlalchemy_field, get_valid_field_names
+from sqlrepo.utils import get_sqlalchemy_attribute, get_valid_field_names
 
 IsValid = bool
 Message = str
@@ -99,7 +99,7 @@ class SimpleFilterConverter(BaseFilterConverter):
         operator_func = builtin_operator.eq
         sqlalchemy_filters: Sequence[SQLAlchemyFilter] = []
         for field_name, value in filter_.items():
-            sqlalchemy_field = get_sqlalchemy_field(model, field_name)
+            sqlalchemy_field = get_sqlalchemy_attribute(model, field_name)
             sqlalchemy_filters.append(operator_func(sqlalchemy_field, value))
         return sqlalchemy_filters
 
@@ -143,7 +143,7 @@ class AdvancedOperatorFilterConverter(BaseFilterConverter):
             raise FilterError(msg)
         operator_str = filter_['operator'] if 'operator' in filter_ else '=='
         operator_func = cls.lookup_mapping[operator_str]
-        sqlalchemy_field = get_sqlalchemy_field(model, filter_['field'])
+        sqlalchemy_field = get_sqlalchemy_attribute(model, filter_['field'])
         return [operator_func(sqlalchemy_field, filter_['value'])]
 
 
@@ -233,6 +233,6 @@ class DjangoLikeFilterConverter(BaseFilterConverter):
                 msg = "Never situation. Don't use _convert_filter method directly!"
                 raise FilterError(msg)
             operator_func = cls.lookup_mapping[lookup]
-            sqlalchemy_field = get_sqlalchemy_field(model, field_name)
+            sqlalchemy_field = get_sqlalchemy_attribute(model, field_name)
             sqlalchemy_filters.append(operator_func(sqlalchemy_field, value))
         return sqlalchemy_filters

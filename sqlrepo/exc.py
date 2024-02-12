@@ -5,6 +5,13 @@ class BaseSQLRepoError(Exception):
     """"""
 
 
+# |--------------| MODELS |--------------|
+
+
+class NoModelFieldError(Exception):
+    """"""
+
+
 # |--------------| REPOSITORIES |--------------|
 
 

@@ -1,11 +1,11 @@
 import datetime
-import zoneinfo
 from typing import Any
 
 import pytest
+import zoneinfo
 from sqlalchemy import Date, Time, cast, extract, func
 
-from sqlrepo.exceptions import FilterError
+from sqlrepo.exc import FilterError
 from sqlrepo.filters.converters import (
     AdvancedOperatorFilterConverter,
     BaseFilterConverter,

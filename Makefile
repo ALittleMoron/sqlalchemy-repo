@@ -77,4 +77,4 @@ format:
 .PHONY: test
 test:
 	@if [ -z $(POETRY) ]; then echo "Poetry could not be found. See https://python-poetry.org/docs/"; exit 2; fi
-	$(ENV_VARS_PREFIX) $(POETRY) run pytest ./tests --cov-report xml --cov-fail-under 60 --cov ./$(NAME) -v -x
+	$(ENV_VARS_PREFIX) $(POETRY) run pytest ./tests --cov-report xml --cov-fail-under 60 --cov ./$(NAME) -v

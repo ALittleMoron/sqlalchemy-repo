@@ -2,14 +2,15 @@
 
 import datetime
 import types
-import zoneinfo
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
+import zoneinfo
 from sqlalchemy import Delete, Insert, Select, Update, inspect
 from sqlalchemy.ext.hybrid import HybridExtensionType
 from sqlalchemy.orm import joinedload
 
+from sqlrepo.exc import NoModelFieldError
 from sqlrepo.logging import logger
 
 if TYPE_CHECKING:
@@ -38,11 +39,11 @@ def get_utc_now() -> datetime.datetime:
     return datetime.datetime.now(zoneinfo.ZoneInfo('UTC'))
 
 
-def get_sqlalchemy_field(
+def get_sqlalchemy_attribute(
     model: type["DeclarativeBase"],
     field_name: str,
 ) -> "QueryableAttribute[Any]":
-    """Get sqlalchemy field (column) object from given model.
+    """Get sqlalchemy field (column) or relationship object from given model.
 
     Args
     ----
@@ -56,7 +57,14 @@ def get_sqlalchemy_field(
     QueryableAttribute[Any]
         any attribute from model, that can be used in queries.
     """
-    # TODO: добавить проверку на существование.
+    valid_attributes = get_all_valid_queryable_attributes(model)
+    if field_name not in valid_attributes:
+        valid_field = ', '.join(valid_attributes)
+        msg = (
+            f'No sqlalchemy attribute "{field_name}" was found in model "{model}". '
+            f'Valid attributes for {model}: {valid_field}'
+        )
+        raise NoModelFieldError(msg)
     sqlalchemy_field = getattr(model, field_name)
     if isinstance(sqlalchemy_field, types.MethodType):
         sqlalchemy_field = sqlalchemy_field()
@@ -97,6 +105,28 @@ def get_registry_class(model: type['DeclarativeBase']) -> '_ClsRegistryType':
         SQLAlchemy registry of all models and other specific objects.
     """
     return model.registry._class_registry  # type: ignore
+
+
+def get_model_class_by_tablename(
+    registry: '_ClsRegistryType',
+    tablename: str,
+) -> type['DeclarativeBase'] | None:
+    """Return class reference mapped to table.
+
+    Args
+    ----
+    registry : _ClsRegistryType
+        SQLAlchemy registry of all models and other specific objects.
+    name : str
+        name of model to find in registry.
+
+    Returns
+    -------
+    Class reference or None.
+    """
+    for c in registry.values():
+        if getattr(c, '__tablename__', None) == tablename:
+            return c
 
 
 def get_model_class_by_name(
@@ -188,6 +218,41 @@ def get_valid_field_names(model: type["DeclarativeBase"]) -> set[str]:
     return set(column_names) | set(hybrid_names)
 
 
+def get_all_valid_queryable_attributes(model: type["DeclarativeBase"]) -> set[str]:
+    """Get sqlalchemy field names and relationships as strings from given model.
+
+    It includes hybrid properties and hybrid methods, because they can be used in queries.
+
+    Args
+    ----
+    model : type[DeclarativeBase]
+        SQLAlchemy declarative model.
+
+    Returns
+    -------
+    set[str]
+        set of model fields and relationships as strings.
+    """
+    return get_valid_relationships_names(model) | get_valid_field_names(model)
+
+
+def get_related_models(model: type["DeclarativeBase"]) -> list["DeclarativeBase"]:
+    """Get sqlalchemy relationship names as strings from given model.
+
+    Args
+    ----
+    model : type[DeclarativeBase]
+        SQLAlchemy declarative model.
+
+    Returns
+    -------
+    set[str]
+        set of model relationships as strings.
+    """
+    inspect_mapper: 'Mapper[Any]' = inspect(model)  # type: ignore
+    return [_relationship.mapper.class_ for _relationship in inspect_mapper.relationships]
+
+
 def is_hybrid_property(orm_descriptor: "InspectionAttr") -> bool:
     """Check, if given field inspected object is hybrid property or not.
 
@@ -249,7 +314,7 @@ def apply_loads(
         sqlalchemy_relationship = None
         for model_ in model_classes:
             if relationship_ in get_valid_relationships_names(model_):
-                sqlalchemy_relationship = get_sqlalchemy_field(model_, relationship_)
+                sqlalchemy_relationship = get_sqlalchemy_attribute(model_, relationship_)
         if not sqlalchemy_relationship:
             # TODO: убрать continue. сделать выкидывание ошибки со списком возможных relationship.
             continue
@@ -291,7 +356,7 @@ def apply_joins(
         # TODO: добавить поиск по названию модели (joins=('ModelName'))
         for model_ in model_classes:
             if relationship_ in get_valid_relationships_names(model_):
-                sqlalchemy_relationship = get_sqlalchemy_field(model_, relationship_)
+                sqlalchemy_relationship = get_sqlalchemy_attribute(model_, relationship_)
         if not sqlalchemy_relationship:
             msg = (
                 f'SQLAlchemy relationship "{relationship_}" was not found in {model_classes}. '
