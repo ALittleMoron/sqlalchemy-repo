@@ -1,13 +1,18 @@
 import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from dev_utils.core.exc import NoModelRelationshipError  # type: ignore
+from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # type: ignore
+from freezegun import freeze_time
+from sqlalchemy import ColumnElement, and_, delete, func, or_, select, text, update
 from sqlalchemy.orm import joinedload, selectinload
 
-from sqlrepo.filters.converters import SimpleFilterConverter
 from sqlrepo.queries import BaseQuery
 from tests.utils import MyModel, OtherModel
+
+now = datetime.datetime.now(tz=ZoneInfo('UTC'))
 
 
 @pytest.mark.parametrize(
@@ -55,11 +60,6 @@ def test_resolve_specific_columns(  # noqa
         ),
         (
             select(MyModel),
-            ['incorrect_value'],
-            select(MyModel),
-        ),
-        (
-            select(MyModel),
             [(OtherModel, MyModel.id == OtherModel.my_model_id)],
             select(MyModel).join(OtherModel),
         ),
@@ -96,12 +96,6 @@ def test_resolve_and_apply_joins(  # noqa
         ),
         (
             select(MyModel),
-            joinedload,
-            ['incorrect_value'],
-            select(MyModel),
-        ),
-        (
-            select(MyModel),
             selectinload,
             ['other_models'],
             select(MyModel).options(selectinload(MyModel.other_models)),
@@ -117,6 +111,12 @@ def test_resolve_and_apply_loads(  # noqa
     query = BaseQuery(SimpleFilterConverter, load_strategy=strategy)
     new_stmt = query._resolve_and_apply_loads(stmt=stmt, loads=loads)  # type: ignore
     assert str(new_stmt) == str(expected_result)
+
+
+def test_resolve_and_apply_loads_incorrect():  # noqa
+    query = BaseQuery(SimpleFilterConverter)
+    with pytest.raises(NoModelRelationshipError):
+        query._resolve_and_apply_loads(stmt=select(MyModel), loads=['incorrect'])  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -287,7 +287,6 @@ def test_get_item_stmt(  # noqa
             None,
             select(func.count()).select_from(MyModel).where(MyModel.name == 'aboba'),
         ),
-        # TODO: поправить баг с join'ом с select(func...)
         (
             None,
             ['other_models'],
@@ -303,7 +302,7 @@ def test_get_item_stmt(  # noqa
         ),
     ],
 )
-def test_get_items_count_stmt(
+def test_get_items_count_stmt(  # noqa
     filters: Any,  # noqa
     joins: Any,  # noqa
     expected_result: Any,  # noqa
@@ -315,3 +314,266 @@ def test_get_items_count_stmt(
         filters=filters,
     )
     assert str(get_items_count_stmt) == str(expected_result)
+
+
+@pytest.mark.parametrize(
+    (
+        'joins',
+        'loads',
+        'filters',
+        'search',
+        'search_by',
+        'order_by',
+        'limit',
+        'offset',
+        'expected_result',
+    ),
+    [
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            select(MyModel),
+        ),
+        (
+            None,
+            None,
+            None,
+            'some_value',
+            None,
+            None,
+            None,
+            None,
+            select(MyModel),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            (MyModel.name,),
+            None,
+            None,
+            None,
+            select(MyModel),
+        ),
+        (
+            None,
+            None,
+            None,
+            'somevalue',
+            (MyModel.name,),
+            None,
+            None,
+            None,
+            select(MyModel).where(MyModel.name.ilike(r'%somevalue%')),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            ('some_value',),
+            None,
+            None,
+            select(MyModel).order_by(text('some_value')),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            None,
+            select(MyModel).limit(1),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            select(MyModel).offset(1),
+        ),
+    ],
+)
+def test_get_item_list_stmt(  # noqa
+    joins: Any,  # noqa
+    loads: Any,  # noqa
+    filters: Any,  # noqa
+    search: Any,  # noqa
+    search_by: Any,  # noqa
+    order_by: Any,  # noqa
+    limit: Any,  # noqa
+    offset: Any,  # noqa
+    expected_result: Any,  # noqa
+) -> None:
+    query = BaseQuery(SimpleFilterConverter)
+    get_item_list_stmt = query._get_item_list_stmt(  # type: ignore
+        model=MyModel,
+        joins=joins,
+        loads=loads,
+        filters=filters,
+        search=search,
+        search_by=search_by,
+        order_by=order_by,
+        limit=limit,
+        offset=offset,
+    )
+    assert str(get_item_list_stmt) == str(expected_result)
+
+
+@pytest.mark.parametrize(
+    (
+        'data',
+        'filters',
+        'expected_result',
+    ),
+    [
+        (
+            {'name': 25},
+            None,
+            update(MyModel).values({'name': 25}).returning(MyModel),
+        ),
+        (
+            {'name': 'aboba'},
+            {'name': 'aboba'},
+            update(MyModel).where(MyModel.name == 'aboba').values({'name': 25}).returning(MyModel),
+        ),
+    ],
+)
+def test_db_update_stmt(  # noqa
+    data: Any,  # noqa
+    filters: Any,  # noqa
+    expected_result: Any,  # noqa
+) -> None:
+    query = BaseQuery(SimpleFilterConverter)
+    db_update_stmt = query._db_update_stmt(  # type: ignore
+        model=MyModel,
+        data=data,
+        filters=filters,
+    )
+    assert str(db_update_stmt) == str(expected_result)
+
+
+@pytest.mark.parametrize(
+    ('filters', 'expected_result'),
+    [
+        (None, delete(MyModel)),
+        ({'name': 'aboba'}, delete(MyModel).where(MyModel.name == 'aboba')),
+    ],
+)
+def test_db_delete_stmt(filters: Any, expected_result: Any):  # noqa
+    query = BaseQuery(SimpleFilterConverter)
+    db_delete_stmt = query._db_delete_stmt(  # type: ignore
+        model=MyModel,
+        filters=filters,
+    )
+    assert str(db_delete_stmt) == str(expected_result)
+
+
+@freeze_time(now)
+@pytest.mark.parametrize(
+    (
+        'ids_to_disable',
+        'id_field',
+        'disable_field',
+        'field_type',
+        'allow_filter_by_value',
+        'extra_filters',
+        'expected_result',
+    ),
+    [
+        (
+            {1, 2, 3},
+            MyModel.id,
+            MyModel.dt,
+            datetime.datetime,
+            False,
+            None,
+            update(MyModel).where(MyModel.id.in_([1, 2, 3])).values({MyModel.dt: now}),
+        ),
+        (
+            {1, 2, 3},
+            MyModel.id,
+            MyModel.bl,
+            bool,
+            False,
+            None,
+            update(MyModel).where(MyModel.id.in_([1, 2, 3])).values({MyModel.bl: True}),
+        ),
+        (
+            {1, 2, 3},
+            MyModel.id,
+            MyModel.bl,
+            bool,
+            True,
+            None,
+            update(MyModel)
+            .where(MyModel.id.in_([1, 2, 3]), MyModel.bl.is_not(True))
+            .values({MyModel.bl: True}),
+        ),
+    ],
+)
+def test_disable_items_stmt(  # noqa
+    ids_to_disable: Any,  # noqa
+    id_field: Any,  # noqa
+    disable_field: Any,  # noqa
+    field_type: Any,  # noqa
+    allow_filter_by_value: Any,  # noqa
+    extra_filters: Any,  # noqa
+    expected_result: Any,  # noqa
+) -> None:  # noqa
+    query = BaseQuery(SimpleFilterConverter)
+    disable_items_stmt = query._disable_items_stmt(  # type: ignore
+        model=MyModel,
+        ids_to_disable=ids_to_disable,
+        id_field=id_field,
+        disable_field=disable_field,
+        field_type=field_type,
+        allow_filter_by_value=allow_filter_by_value,
+        extra_filters=extra_filters,
+    )
+    assert str(disable_items_stmt) == str(expected_result)
+
+
+def test_disable_items_stmt_type_error():  # noqa
+    query = BaseQuery(SimpleFilterConverter)
+    with pytest.raises(TypeError):
+        query._disable_items_stmt(  # type: ignore
+            model=MyModel,
+            ids_to_disable={1, 2, 3},
+            id_field=MyModel.id,
+            disable_field=MyModel.bl,
+            field_type=str,  # type: ignore
+            allow_filter_by_value=True,
+            extra_filters=None,
+        )
+
+
+def test_disable_items_stmt_value_error():  # noqa
+    query = BaseQuery(SimpleFilterConverter)
+    with pytest.raises(
+        ValueError,
+        match='Parameter "ids_to_disable" should contains at least one element.',
+    ):
+        query._disable_items_stmt(  # type: ignore
+            model=MyModel,
+            ids_to_disable=set(),  # type: ignore
+            id_field=MyModel.id,
+            disable_field=MyModel.bl,
+            field_type=bool,
+            allow_filter_by_value=True,
+            extra_filters=None,
+        )

@@ -64,6 +64,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 "src/cli/commands/*" = ["E402", "ANN201"]
 "src/cli/__init__.py" = ["E402", "ANN201", "FBT001", "FBT002", "UP007"]
 "manage.py" = ["E402"]
+"tests/*" = ["D103"]
 
 
 [tool.black]
@@ -93,14 +94,15 @@ multi_line_output = 3
 
 [tool.coverage]
 [tool.coverage.run]
-source = ["app"]
+source = ["sqlrepo"]
 branch = true
 omit = ['']
 
 [tool.coverage.report]
 exclude_lines = [
     "enum.Enum",
-    "pragma: no cover",
+    "# noqa",
+    "# pragma: no cover",
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
@@ -117,38 +119,46 @@ exclude = ['tests']
 [tool.bandit.assert_used]
 skips = ['*_test.py', '*/test_*.py']
 
+[tool.pdm]
+distribution = true
 
-[tool.poetry]
+[tool.pdm.dev-dependencies]
+dev = [
+    "ruff>=0.3.4",
+    "vulture>=2.11",
+    "pytest>=8.1.1",
+    "black>=24.3.0",
+    "bandit>=1.7.8",
+    "coverage>=7.4.4",
+    "pytest-cov>=4.1.0",
+    "isort>=5.13.2",
+    "pyright>=1.1.355",
+    "freezegun>=1.4.0",
+    "mimesis>=15.1.0",
+    "ipython>=8.22.2",
+    "sqlalchemy-utils>=0.41.2",
+    "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
+    "pytest-asyncio>=0.23.6",
+    "httpx>=0.27.0",
+    "pyment>=0.3.3",
+    "ipython>=8.19.0",
+]
+
+
+[project]
 name = "sqlrepo"
 version = "0.1.0"
-description = "SQLAlchemy repositories with CRUD operations and other utils for it."
-authors = ["Dmitriy Lunev <dima.lunev14@gmail.com>"]
+description = "sqlalchemy repositories with crud operations and other utils for it."
+authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
+requires-python = ">=3.11"
 readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "sqlalchemy>=2.0.29",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-sqlalchemy = "^2.0.24"
-abstractcp = "^0.9.9"
-
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.1.9"
-vulture = "^2.10"
-pytest = "^7.4.3"
-black = "^23.12.1"
-bandit = "^1.7.6"
-coverage = "^7.4.0"
-pytest-cov = "^4.1.0"
-isort = "^5.13.2"
-pyright = "^1.1.343"
-sqlalchemy-utils = "^0.41.1"
-freezegun = "^1.4.0"
-
-
-[tool.poetry.group.local-tools.dependencies]
-pyment = "^0.3.3"
-ipython = "^8.19.0"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

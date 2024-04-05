@@ -2,33 +2,34 @@ import types
 from abc import ABC, abstractmethod
 from typing import Self
 
-from abstractcp import Abstract, abstract_class_property
+from dev_utils.core.abstract import Abstract, abstract_class_property  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from sqlrepo.logging import logger
 
 
-class BaseUnitOfWork(ABC, Abstract):
-    # """Класс единицы работы бизнес-логики."""
+class BaseAsyncUnitOfWork(ABC, Abstract):
 
     session_factory: 'async_sessionmaker[AsyncSession]' = abstract_class_property(
         async_sessionmaker[AsyncSession],
     )
 
-    async def __aenter__(self: Self) -> Self:
-        # """Асинхронный вход в контекстный менеджер единицы работы бизнес-логики."""
+    @abstractmethod
+    def init_repositories(self, session: 'AsyncSession') -> None:
+        raise NotImplementedError()
+
+    async def __aenter__(self) -> Self:
         self.session = self.session_factory()
-        # NOTE: прокидываем сессию явно, чтобы иметь возможность использовать метод без with
         self.init_repositories(self.session)
         return self
 
     async def __aexit__(
-        self: Self,
+        self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
         traceback: types.TracebackType | None,
     ) -> None:
-        # """Асинхронный выход из контекстного менеджера единицы работы бизнес-логики."""
         if exc:
             logger.error('UNIT-OF-WORK E0: %s', exc)
             await self.rollback()
@@ -36,28 +37,61 @@ class BaseUnitOfWork(ABC, Abstract):
             await self.commit()
         await self.close()
 
-    @abstractmethod
-    def init_repositories(self: Self, session: 'AsyncSession') -> None:
-        # """Инициализирует классы репозиториев, переданные."""
-        raise NotImplementedError()
-
-    async def commit(self: Self) -> None:
-        # """Фиксирует изменения транзакции в базе данных (alias к ``commit`` сессии)."""
+    async def commit(self) -> None:
         if not self.session:
-            # NOTE: на случай, если класс был использован не через with
             return
         await self.session.commit()
 
-    async def rollback(self: Self) -> None:
-        # """Откатывает изменения транзакции в базе данных (alias к ``rollback`` сессии)."""
+    async def rollback(self) -> None:
         if not self.session:
-            # NOTE: на случай, если класс был использован не через with
             return
         await self.session.rollback()
 
-    async def close(self: Self) -> None:
-        # """Закрывает сессию (alias к ``close`` сессии.)."""
+    async def close(self) -> None:
         if not self.session:
-            # NOTE: на случай, если класс был использован не через with
             return
         await self.session.close()
+
+
+class BaseSyncUnitOfWork(ABC, Abstract):
+
+    session_factory: 'sessionmaker[Session]' = abstract_class_property(
+        sessionmaker[Session],
+    )
+
+    @abstractmethod
+    def init_repositories(self, session: 'Session') -> None:
+        raise NotImplementedError()
+
+    def __enter__(self) -> Self:
+        self.session = self.session_factory()
+        self.init_repositories(self.session)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: types.TracebackType | None,
+    ) -> None:
+        if exc:
+            logger.error('UNIT-OF-WORK E0: %s', exc)
+            self.rollback()
+        else:
+            self.commit()
+        self.close()
+
+    def commit(self) -> None:
+        if not self.session:
+            return
+        self.session.commit()
+
+    def rollback(self) -> None:
+        if not self.session:
+            return
+        self.session.rollback()
+
+    def close(self) -> None:
+        if not self.session:
+            return
+        self.session.close()

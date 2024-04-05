@@ -2,36 +2,22 @@
 
 
 class BaseSQLRepoError(Exception):
-    """"""
-
-
-# |--------------| MODELS |--------------|
-
-
-class NoModelFieldError(Exception):
-    """"""
+    """Base sqlrepo error."""
 
 
 # |--------------| REPOSITORIES |--------------|
 
 
 class RepositoryError(BaseSQLRepoError):
-    """"""
+    """Base repository error."""
 
 
 class RepositoryAttributeError(RepositoryError):
-    """"""
-
-
-# |--------------| FILTERS |--------------|
-
-
-class FilterError(BaseSQLRepoError):
-    """"""
+    """Repository error about incorrect attribute."""
 
 
 # |--------------| QUERIES |--------------|
 
 
 class QueryError(BaseSQLRepoError):
-    """"""
+    """Base query error."""

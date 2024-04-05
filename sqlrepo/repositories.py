@@ -1,9 +1,8 @@
-""""""
 import datetime
+from collections.abc import Callable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
     Final,
     Generic,
@@ -14,17 +13,17 @@ from typing import (
     get_args,
 )
 
-from sqlalchemy.orm import DeclarativeBase as Base
-from sqlalchemy.orm import joinedload
-
-from sqlrepo import exc as sqlrepo_exc
-from sqlrepo.filters.converters import (
+from dev_utils.sqlalchemy.filters.converters import (  # type: ignore
     AdvancedOperatorFilterConverter,
     BaseFilterConverter,
     DjangoLikeFilterConverter,
     SimpleFilterConverter,
 )
-from sqlrepo.filters.schemas import FilterConverterStrategiesLiteral
+from dev_utils.sqlalchemy.filters.types import FilterConverterStrategiesLiteral  # type: ignore
+from sqlalchemy.orm import DeclarativeBase as Base
+from sqlalchemy.orm import joinedload
+
+from sqlrepo import exc as sqlrepo_exc
 from sqlrepo.queries import BaseAsyncQuery
 
 if TYPE_CHECKING:
@@ -60,8 +59,6 @@ BaseSQLAlchemyModel = TypeVar('BaseSQLAlchemyModel', bound=Base)
 
 
 class BaseRepository(Generic[BaseSQLAlchemyModel]):
-    """"""
-
     _model_class: type['BaseSQLAlchemyModel']
 
     # TODO: добавить specific_column_mapping в фильтры, joins и loads.
@@ -87,9 +84,11 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     }
 
     def __init_subclass__(cls) -> None:  # noqa: D105
+        if cls.__name__ == 'BaseAsyncRepository':  # TODO: or cls is BaseSyncRepository
+            return
         if hasattr(cls, '_model_class'):
             msg = (
-                "Don\'t change _model_class attribute to class. Use generic syntax instead. "
+                "Don't change _model_class attribute to class. Use generic syntax instead. "
                 "See PEP 646 (https://peps.python.org/pep-0646/)"
             )
             raise sqlrepo_exc.RepositoryAttributeError(msg)
@@ -97,6 +96,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             # PEP-560: https://peps.python.org/pep-0560/
             # NOTE: this code is needed for getting type from generic: Generic[int] -> int type
             # get_args get params from __orig_bases__, that contains Generic passed types.
+            # FIXME: Может быть указана типизация через строчку, из-за чего в аргументах будет typing.ForwardRef
             model, *_ = get_args(cls.__orig_bases__[0])  # type: ignore
         except Exception as exc:
             msg = f'Error during getting information about Generic types for {cls.__name__}.'
@@ -138,14 +138,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         joins: 'Sequence[Join] | None' = None,
         loads: 'Sequence[Load] | None' = None,
     ) -> 'BaseSQLAlchemyModel | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         result = await self.queries.get_item(
             model=self._model_class,
             joins=joins,
@@ -160,14 +152,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         joins: 'Sequence[Join] | None' = None,
         filters: 'Filter | None' = None,
     ) -> int:
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         result = await self.queries.get_items_count(
             model=self._model_class,
             joins=joins,
@@ -178,6 +162,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def list(  # noqa: A003
         self,
         *,
+        # TODO: улучшить интерфейс, чтобы можно было принимать как 1 элемент, так и несколько
         joins: 'Sequence[Join] | None' = None,
         loads: 'Sequence[Load] | None' = None,
         filters: 'Filter | None' = None,
@@ -187,18 +172,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> 'Sequence[BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-
-        Raises
-        ------
-        ValueError
-        """
         result = await self.queries.get_item_list(
             model=self._model_class,
             joins=joins,
@@ -218,14 +191,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         *,
         data: 'DataDict | None' = None,
     ) -> 'BaseSQLAlchemyModel':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         result = await self.queries.create_item(
             model=self._model_class,
             data=data,
@@ -239,14 +204,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         data: 'DataDict',
         filters: 'Filter | None' = None,
     ) -> 'Sequence[BaseSQLAlchemyModel] | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         result = await self.queries.db_update(
             model=self._model_class,
             data=data,
@@ -261,14 +218,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         instance: 'BaseSQLAlchemyModel',
         data: 'DataDict',
     ) -> 'tuple[bool, BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         result = await self.queries.change_item(
             data=data,
             item=instance,
@@ -284,14 +233,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         ids_to_disable: set[Any],
         extra_filters: 'Filter | None' = None,
     ) -> 'Count':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         if self.id_field is None or self.disable_field is None:
             msg = (
                 'Attribute "id_field" or "disable_field" not set in your repository class. '

@@ -5,3 +5,5 @@ rules.txt
 .ruff_cache
 __pycache__
 .ruff_cache
+project.todo
+.pdm-python

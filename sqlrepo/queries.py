@@ -1,15 +1,20 @@
 import datetime
 import re
-from typing import TYPE_CHECKING, Any, Callable, Literal, NotRequired, TypedDict, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar
 
-from sqlalchemy import CursorResult, and_, delete
+from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter  # type: ignore
+from dev_utils.sqlalchemy.utils import (  # type: ignore
+    apply_joins,
+    apply_loads,
+    get_sqlalchemy_attribute,
+    get_utc_now,
+)
+from sqlalchemy import CursorResult, and_, delete, func, or_, select, text, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import joinedload
 
-from sqlrepo.filters.converters import BaseFilterConverter
 from sqlrepo.logging import logger
-from sqlrepo.utils import apply_joins, apply_loads, get_sqlalchemy_attribute, get_utc_now
 
 
 class JoinKwargs(TypedDict):
@@ -37,6 +42,7 @@ if TYPE_CHECKING:
     T = TypeVar('T')
     Count = int
     Deleted = bool
+    Updated = bool
     Model = type[Base]
     JoinClause = ColumnElement[bool]
     ModelWithOnclause = tuple[Model, JoinClause]
@@ -51,7 +57,6 @@ if TYPE_CHECKING:
 
 
 class BaseQuery:
-    """"""
 
     def __init__(
         self,
@@ -84,7 +89,6 @@ class BaseQuery:
         stmt: 'Select[tuple[T]]',
         joins: 'Sequence[Join]',
     ) -> 'Select[tuple[T]]':
-        """"""
         for join in joins:
             if isinstance(join, tuple | list):
                 target, clause, *kw_list = join
@@ -102,7 +106,6 @@ class BaseQuery:
         stmt: 'Select[tuple[T]]',
         loads: 'Sequence[Load]',
     ) -> 'Select[tuple[T]]':
-        """"""
         for load in loads:
             stmt = (
                 apply_loads(stmt, load, load_strategy=self.load_strategy)
@@ -122,14 +125,6 @@ class BaseQuery:
         allow_filter_by_value: bool = True,
         extra_filters: 'Filter | None' = None,
     ) -> list['ColumnElement[bool]']:
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         filters: list['ColumnElement[bool]'] = list()
         filters.append(id_field.in_(ids_to_disable))
         if allow_filter_by_value and field_type == bool:
@@ -149,7 +144,6 @@ class BaseQuery:
         use_and_clause: bool = False,
         # TODO: добавить флаг case_insensitive: bool = True
     ) -> 'ColumnElement[bool]':
-        """"""
         filters: list['ColumnElement[bool]'] = []
         search_by_args = self._resolve_specific_columns(elements=search_by_args)  # type: ignore
         for search_by in search_by_args:
@@ -171,7 +165,6 @@ class BaseQuery:
         joins: 'Sequence[Join] | None' = None,
         loads: 'Sequence[Load] | None' = None,
     ) -> 'Select[tuple[BaseSQLAlchemyModel]]':
-        """"""
         stmt = select(model)
         if joins is not None:
             stmt = self._resolve_and_apply_joins(stmt=stmt, joins=joins)
@@ -192,14 +185,6 @@ class BaseQuery:
         joins: 'Sequence[Join] | None' = None,
         filters: 'Filter | None' = None,
     ) -> 'Select[tuple[int]]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = select(func.count()).select_from(model)
         if joins is not None:
             stmt = self._resolve_and_apply_joins(stmt=stmt, joins=joins)
@@ -223,11 +208,17 @@ class BaseQuery:
     ) -> 'Select[tuple[BaseSQLAlchemyModel]]':
         stmt = self._get_item_stmt(model=model, filters=filters, joins=joins, loads=loads)
         if search is not None and search_by is not None:
+            # TODO: нужно проверить, действительно ли escape и transform нужны. Может, оно только
+            #       создает баги.
             search = re.escape(search)
             search = search.translate(str.maketrans({'%': r'\%', '_': r'\_', '/': r'\/'}))
             stmt = stmt.where(self._make_search_filter(search, model, *search_by))
         if order_by is not None:
-            stmt = stmt.order_by(*self._resolve_specific_columns(elements=order_by))
+            order_by_resolved = self._resolve_specific_columns(elements=order_by)
+            order_by_resolved = [
+                text(ele) if isinstance(ele, str) else ele for ele in order_by_resolved
+            ]
+            stmt = stmt.order_by(*order_by_resolved)
         if limit is not None:
             stmt = stmt.limit(limit)
         if offset is not None:
@@ -239,6 +230,7 @@ class BaseQuery:
         *,
         model: type['BaseSQLAlchemyModel'],
         data: 'DataDict',
+        # TODO: add joins for it (because of filters - they can be nested.)
         filters: 'Filter | None' = None,
     ) -> 'ReturningUpdate[tuple[BaseSQLAlchemyModel]]':
         stmt = update(model)
@@ -270,51 +262,36 @@ class BaseQuery:
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
         extra_filters: 'Filter | None' = None,
-    ) -> 'Update | Count':
+    ) -> 'Update':
         if issubclass(field_type, bool):
             field_value = True
         elif issubclass(field_type, datetime.datetime):  # type: ignore
             field_value = get_utc_now()
         else:
-            # msg = (
-            #     f'Параметр "field_type" должен быть одним из следующих: bool, datetime. '
-            #     f'Был передан {field_type}.'
-            # )
-            msg = ''  # FIXME
+            msg = (
+                'Parameter "field_type" should be one of the following: bool, datetime. '
+                f'{field_type} was passed.'
+            )
+            logger.error(msg)
             raise TypeError(msg)
-        if not ids_to_disable:
-            return 0
-        try:
-            filters = self._make_disable_filters(
-                model=model,
-                ids_to_disable=ids_to_disable,
-                id_field=id_field,
-                disable_field=disable_field,
-                field_type=field_type,
-                allow_filter_by_value=allow_filter_by_value,
-                extra_filters=extra_filters,
-            )
-        except AttributeError:
-            params = dict(
-                model=model,
-                ids_to_disable=ids_to_disable,
-                id_field=id_field,
-                disable_field=disable_field,
-                field_type=field_type,
-                allow_filter_by_value=allow_filter_by_value,
-                extra_filters=extra_filters,
-            )
-            logger.exception(
-                '',  # FIXME
-                params,
-            )
-            return 0
+        if len(ids_to_disable) == 0:
+            msg = 'Parameter "ids_to_disable" should contains at least one element.'
+            logger.error(msg)
+            raise ValueError(msg)
+        filters = self._make_disable_filters(
+            model=model,
+            ids_to_disable=ids_to_disable,
+            id_field=id_field,
+            disable_field=disable_field,
+            field_type=field_type,
+            allow_filter_by_value=allow_filter_by_value,
+            extra_filters=extra_filters,
+        )
         stmt = update(model).where(*filters).values({disable_field: field_value})
         return stmt
 
 
 class BaseSyncQuery(BaseQuery):
-    """"""
 
     def __init__(
         self,
@@ -334,17 +311,6 @@ class BaseSyncQuery(BaseQuery):
         joins: 'Sequence[Join] | None' = None,
         loads: 'Sequence[Load] | None' = None,
     ) -> 'BaseSQLAlchemyModel | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-
-        Raises
-        ------
-        """
         stmt = self._get_item_stmt(
             model=model,
             filters=filters,
@@ -361,21 +327,14 @@ class BaseSyncQuery(BaseQuery):
         joins: 'Sequence[Join] | None' = None,
         filters: 'Filter | None' = None,
     ) -> int:
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._get_items_count_stmt(
             model=model,
             joins=joins,
             filters=filters,
         )
         count = self.session.scalar(stmt)
-        if count is None:
+        # NOTE: code block for sure.
+        if count is None:  # pragma: no cover
             count = 0
         return count
 
@@ -393,14 +352,6 @@ class BaseSyncQuery(BaseQuery):
         offset: int | None = None,
         unique_items: bool = False,
     ) -> 'Sequence[BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._get_item_list_stmt(
             model=model,
             joins=joins,
@@ -421,17 +372,10 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type['BaseSQLAlchemyModel'],
+        # TODO: add sequence of data to make more than one object at the same time.
         data: 'DataDict | None' = None,
         use_flush: bool = False,
     ) -> 'BaseSQLAlchemyModel':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         item = model() if data is None else model(**data)
         self.session.add(item)
         if use_flush:
@@ -439,12 +383,11 @@ class BaseSyncQuery(BaseQuery):
         else:
             self.session.commit()
 
-        # FIXME
-        # logger.debug(
-        #     'Создание в БД: успешное создание. Экземпляр: %s. %s.',
-        #     item,
-        #     'Создание без фиксирования.' if use_flush else 'Создание и фиксирование.',
-        # )
+        msg = (
+            f"Create row in database. Item: {item}. "
+            f"{'Flush used.' if use_flush else 'Commit used.'}."
+        )
+        logger.debug(msg)
         return item
 
     def db_update(
@@ -454,15 +397,7 @@ class BaseSyncQuery(BaseQuery):
         data: 'DataDict',
         filters: 'Filter | None' = None,
         use_flush: bool = False,
-    ) -> 'Sequence[BaseSQLAlchemyModel] | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
+    ) -> 'Sequence[BaseSQLAlchemyModel]':
         stmt = self._db_update_stmt(
             model=model,
             data=data,
@@ -479,19 +414,12 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         data: 'DataDict',
+        # TODO: add sequence items to make more than one object update at the same time.
         item: 'BaseSQLAlchemyModel',
         set_none: bool = False,
-        allowed_none_fields: 'Literal["*"] | Sequence[str]' = '*',
+        allowed_none_fields: 'Literal["*"] | set[str]' = '*',
         use_flush: bool = False,
-    ) -> 'tuple[bool, BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
+    ) -> 'tuple[Updated, BaseSQLAlchemyModel]':
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
@@ -509,17 +437,11 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        # FIXME
-        # logger.debug(
-        #     (
-        #         'Обновление строки БД: успешное обновление. Экземпляр: %r. Параметры: %s, '
-        #         'set_none: %s, use_flush: %s.'
-        #     ),
-        #     item,
-        #     data,
-        #     set_none,
-        #     use_flush,
-        # )
+        msg = (
+            f'Update database row success. Item: {item:r}. Params: {data}, '
+            f'set_none: {set_none}, use_flush: {use_flush}.'
+        )
+        logger.debug(msg)
         return is_updated, item
 
     def db_delete(
@@ -529,14 +451,6 @@ class BaseSyncQuery(BaseQuery):
         filters: 'Filter | None' = None,
         use_flush: bool = False,
     ) -> 'Count':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._db_delete_stmt(
             model=model,
             filters=filters,
@@ -548,8 +462,6 @@ class BaseSyncQuery(BaseQuery):
             self.session.commit()
         if isinstance(result, CursorResult):  # type: ignore
             return result.rowcount
-        # FIXME
-        # не получится узнать реальное количество измененных сущностей. Поэтому 0.
         return 0
 
     def delete_item(
@@ -558,14 +470,6 @@ class BaseSyncQuery(BaseQuery):
         item: 'Base',
         use_flush: bool = False,
     ) -> 'Deleted':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         item_repr = repr(item)
         try:
             self.session.delete(item)
@@ -575,11 +479,11 @@ class BaseSyncQuery(BaseQuery):
                 self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             self.session.rollback()
-            # FIXME
-            # logger.warning('Удаление из БД: ошибка удаления: %s', exc)
+            msg = f'Delete from database error: {exc}'  # noqa: S608
+            logger.warning(msg)
             return False
-        # FIXME
-        # logger.debug('Удаление из БД: успешное удаление. Экземпляр: %s', item_repr)
+        msg = f'Delete from database success. Item: {item_repr}'  # noqa: S608
+        logger.debug(msg)
         return True
 
     def disable_items(
@@ -594,19 +498,6 @@ class BaseSyncQuery(BaseQuery):
         extra_filters: 'Filter | None' = None,
         use_flush: bool = False,
     ) -> 'Count':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-
-        Raises
-        ------
-        TypeError
-        AttributeError
-        """
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
@@ -623,17 +514,12 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        # FIXME
-        # только в CursorResult есть атрибут rowcount
         if isinstance(result, CursorResult):  # type: ignore
             return result.rowcount
-        # FIXME
-        # не получится узнать реальное количество измененных сущностей. Поэтому 0.
         return 0
 
 
 class BaseAsyncQuery(BaseQuery):
-    """Base async query class."""
 
     def __init__(
         self,
@@ -653,17 +539,6 @@ class BaseAsyncQuery(BaseQuery):
         joins: 'Sequence[Join] | None' = None,
         loads: 'Sequence[Load] | None' = None,
     ) -> 'BaseSQLAlchemyModel | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-
-        Raises
-        ------
-        """
         stmt = self._get_item_stmt(
             model=model,
             filters=filters,
@@ -680,21 +555,14 @@ class BaseAsyncQuery(BaseQuery):
         joins: 'Sequence[Join] | None' = None,
         filters: 'Filter | None' = None,
     ) -> int:
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._get_items_count_stmt(
             model=model,
             joins=joins,
             filters=filters,
         )
         count = await self.session.scalar(stmt)
-        if count is None:
+        # NOTE: code block for sure.
+        if count is None:  # pragma: no cover
             count = 0
         return count
 
@@ -712,14 +580,6 @@ class BaseAsyncQuery(BaseQuery):
         offset: int | None = None,
         unique_items: bool = False,
     ) -> 'Sequence[BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._get_item_list_stmt(
             model=model,
             joins=joins,
@@ -743,14 +603,6 @@ class BaseAsyncQuery(BaseQuery):
         data: 'DataDict | None' = None,
         use_flush: bool = False,
     ) -> 'BaseSQLAlchemyModel':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         item = model() if data is None else model(**data)
         self.session.add(item)
         if use_flush:
@@ -758,12 +610,11 @@ class BaseAsyncQuery(BaseQuery):
         else:
             await self.session.commit()
 
-        # FIXME
-        # logger.debug(
-        #     'Создание в БД: успешное создание. Экземпляр: %s. %s.',
-        #     item,
-        #     'Создание без фиксирования.' if use_flush else 'Создание и фиксирование.',
-        # )
+        msg = (
+            f"Create row in database. Item: {item}. "
+            f"{'Flush used.' if use_flush else 'Commit used.'}."
+        )
+        logger.debug(msg)
         return item
 
     async def db_update(
@@ -774,14 +625,6 @@ class BaseAsyncQuery(BaseQuery):
         filters: 'Filter | None' = None,
         use_flush: bool = False,
     ) -> 'Sequence[BaseSQLAlchemyModel] | None':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._db_update_stmt(
             model=model,
             data=data,
@@ -803,14 +646,6 @@ class BaseAsyncQuery(BaseQuery):
         allowed_none_fields: 'Literal["*"] | Sequence[str]' = '*',
         use_flush: bool = False,
     ) -> 'tuple[bool, BaseSQLAlchemyModel]':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
@@ -828,17 +663,11 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        # FIXME
-        # logger.debug(
-        #     (
-        #         'Обновление строки БД: успешное обновление. Экземпляр: %r. Параметры: %s, '
-        #         'set_none: %s, use_flush: %s.'
-        #     ),
-        #     item,
-        #     data,
-        #     set_none,
-        #     use_flush,
-        # )
+        msg = (
+            f'Update database row success. Item: {item:r}. Params: {data}, '
+            f'set_none: {set_none}, use_flush: {use_flush}.'
+        )
+        logger.debug(msg)
         return is_updated, item
 
     async def db_delete(
@@ -848,14 +677,6 @@ class BaseAsyncQuery(BaseQuery):
         filters: 'Filter | None' = None,
         use_flush: bool = False,
     ) -> 'Count':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         stmt = self._db_delete_stmt(
             model=model,
             filters=filters,
@@ -867,8 +688,6 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.commit()
         if isinstance(result, CursorResult):  # type: ignore
             return result.rowcount
-        # FIXME
-        # не получится узнать реальное количество измененных сущностей. Поэтому 0.
         return 0
 
     async def delete_item(
@@ -877,14 +696,6 @@ class BaseAsyncQuery(BaseQuery):
         item: 'Base',
         use_flush: bool = False,
     ) -> 'Deleted':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
         item_repr = repr(item)
         try:
             await self.session.delete(item)
@@ -894,11 +705,11 @@ class BaseAsyncQuery(BaseQuery):
                 await self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             await self.session.rollback()
-            # FIXME
-            # logger.warning('Удаление из БД: ошибка удаления: %s', exc)
+            msg = f'Delete from database error: {exc}'  # noqa: S608
+            logger.warning(msg)
             return False
-        # FIXME
-        # logger.debug('Удаление из БД: успешное удаление. Экземпляр: %s', item_repr)
+        msg = f'Delete from database success. Item: {item_repr}'  # noqa: S608
+        logger.debug(msg)
         return True
 
     async def disable_items(
@@ -913,21 +724,6 @@ class BaseAsyncQuery(BaseQuery):
         extra_filters: 'Filter | None' = None,
         use_flush: bool = False,
     ) -> 'Count':
-        """
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        int
-
-
-        Raises
-        ------
-        TypeError
-        AttributeError
-        """
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
@@ -944,10 +740,6 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        # FIXME
-        # только в CursorResult есть атрибут rowcount
         if isinstance(result, CursorResult):  # type: ignore
             return result.rowcount
-        # FIXME
-        # не получится узнать реальное количество измененных сущностей. Поэтому 0.
         return 0

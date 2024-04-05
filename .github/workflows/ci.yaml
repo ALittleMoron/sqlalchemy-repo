@@ -1,0 +1,29 @@
+name: Tests And Linting
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    name: "Test (${{ matrix.python-version }}"
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.11", "3.12"]
+    uses: ./.github/workflows/test.yaml
+    with:
+      coverage: true
+      python-version: ${{ matrix.python-version }}
+  quality:
+    name: "Code quality check (${{ matrix.python-version }}"
+    needs:
+      - test
+    strategy:
+      fail-fast: true
+      matrix:
+        python-version: ["3.12"]
+        poetry-version: ["1.8"]
+    uses: ./.github/workflows/lint.yaml
+    with:
+      python-version: ${{ matrix.python-version }}
