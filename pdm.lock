@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:8784a296a98bbb872ff205adf9612a448bc0dbbd7528451852c1207cc342eb4f"
+content_hash = "sha256:22c0ebe5862f6b1747f65d5c81b466e70e0849b87158be23ea7d6818f092d1d3"
 
 [[package]]
 name = "anyio"
@@ -718,6 +718,32 @@ dependencies = [
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
+]
+
+[[package]]
+name = "python-dev-utils"
+version = "0.1.1"
+requires_python = ">=3.11"
+summary = "My project utils package, that I use in my projects."
+groups = ["default"]
+files = [
+    {file = "python_dev_utils-0.1.1-py3-none-any.whl", hash = "sha256:b7cd0763413a1d11ea2849e3ad30998f694e2985a3c5899590723c5f084d3ef4"},
+    {file = "python_dev_utils-0.1.1.tar.gz", hash = "sha256:33a6b79a5b5e6cd3421f56e6b61432296e324c71177560252d93b448863fbdf5"},
+]
+
+[[package]]
+name = "python-dev-utils"
+version = "0.1.1"
+extras = ["filtering"]
+requires_python = ">=3.11"
+summary = "My project utils package, that I use in my projects."
+groups = ["default"]
+dependencies = [
+    "python-dev-utils==0.1.1",
+]
+files = [
+    {file = "python_dev_utils-0.1.1-py3-none-any.whl", hash = "sha256:b7cd0763413a1d11ea2849e3ad30998f694e2985a3c5899590723c5f084d3ef4"},
+    {file = "python_dev_utils-0.1.1.tar.gz", hash = "sha256:33a6b79a5b5e6cd3421f56e6b61432296e324c71177560252d93b448863fbdf5"},
 ]
 
 [[package]]

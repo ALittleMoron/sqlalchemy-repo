@@ -438,7 +438,7 @@ class BaseSyncQuery(BaseQuery):
         else:
             self.session.commit()
         msg = (
-            f'Update database row success. Item: {item:r}. Params: {data}, '
+            f'Update database row success. Item: {repr(item)}. Params: {data}, '
             f'set_none: {set_none}, use_flush: {use_flush}.'
         )
         logger.debug(msg)
@@ -664,7 +664,7 @@ class BaseAsyncQuery(BaseQuery):
         else:
             await self.session.commit()
         msg = (
-            f'Update database row success. Item: {item:r}. Params: {data}, '
+            f'Update database row success. Item: {repr(item)}. Params: {data}, '
             f'set_none: {set_none}, use_flush: {use_flush}.'
         )
         logger.debug(msg)
