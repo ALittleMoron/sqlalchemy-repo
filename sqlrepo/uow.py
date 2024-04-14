@@ -10,13 +10,12 @@ from sqlrepo.logging import logger
 
 
 class BaseAsyncUnitOfWork(ABC, Abstract):
-
-    session_factory: 'async_sessionmaker[AsyncSession]' = abstract_class_property(
+    session_factory: "async_sessionmaker[AsyncSession]" = abstract_class_property(
         async_sessionmaker[AsyncSession],
     )
 
     @abstractmethod
-    def init_repositories(self, session: 'AsyncSession') -> None:
+    def init_repositories(self, session: "AsyncSession") -> None:
         raise NotImplementedError()
 
     async def __aenter__(self) -> Self:
@@ -31,7 +30,7 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
         traceback: types.TracebackType | None,
     ) -> None:
         if exc:
-            logger.error('UNIT-OF-WORK E0: %s', exc)
+            logger.error("UNIT-OF-WORK E0: %s", exc)
             await self.rollback()
         else:
             await self.commit()
@@ -54,13 +53,12 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 
 
 class BaseSyncUnitOfWork(ABC, Abstract):
-
-    session_factory: 'sessionmaker[Session]' = abstract_class_property(
+    session_factory: "sessionmaker[Session]" = abstract_class_property(
         sessionmaker[Session],
     )
 
     @abstractmethod
-    def init_repositories(self, session: 'Session') -> None:
+    def init_repositories(self, session: "Session") -> None:
         raise NotImplementedError()
 
     def __enter__(self) -> Self:
@@ -75,7 +73,7 @@ class BaseSyncUnitOfWork(ABC, Abstract):
         traceback: types.TracebackType | None,
     ) -> None:
         if exc:
-            logger.error('UNIT-OF-WORK E0: %s', exc)
+            logger.error("UNIT-OF-WORK E0: %s", exc)
             self.rollback()
         else:
             self.commit()

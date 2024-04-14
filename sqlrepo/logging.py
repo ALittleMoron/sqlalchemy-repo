@@ -27,4 +27,4 @@ LOGGER_CONFIG = {
 
 
 logging.config.dictConfig(LOGGER_CONFIG)
-logger = logging.getLogger('sqlrepo')
+logger = logging.getLogger("sqlrepo")

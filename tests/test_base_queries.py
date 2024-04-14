@@ -12,26 +12,26 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlrepo.queries import BaseQuery
 from tests.utils import MyModel, OtherModel
 
-now = datetime.datetime.now(tz=ZoneInfo('UTC'))
+now = datetime.datetime.now(tz=ZoneInfo("UTC"))
 
 
 @pytest.mark.parametrize(
-    ('specific_column_mapping', 'elements', 'expected_result'),
+    ("specific_column_mapping", "elements", "expected_result"),
     [
         (
             None,
-            ['other_model_id', MyModel.name],
-            ['other_model_id', MyModel.name],
+            ["other_model_id", MyModel.name],
+            ["other_model_id", MyModel.name],
         ),
         (
-            {'other_model_id': OtherModel.id, 'some_other_model_field': OtherModel.name},
-            ['other_model_id', MyModel.name],
+            {"other_model_id": OtherModel.id, "some_other_model_field": OtherModel.name},
+            ["other_model_id", MyModel.name],
             [OtherModel.id, MyModel.name],
         ),
         (
-            {'other_model_id': OtherModel.id, 'some_other_model_field': OtherModel.name},
-            ['not_presented_field', 'other_model_id'],
-            ['not_presented_field', OtherModel.id],
+            {"other_model_id": OtherModel.id, "some_other_model_field": OtherModel.name},
+            ["not_presented_field", "other_model_id"],
+            ["not_presented_field", OtherModel.id],
         ),
     ],
 )
@@ -46,7 +46,7 @@ def test_resolve_specific_columns(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('stmt', 'joins', 'expected_result'),
+    ("stmt", "joins", "expected_result"),
     [
         (
             select(MyModel),
@@ -55,7 +55,7 @@ def test_resolve_specific_columns(  # noqa
         ),
         (
             select(MyModel),
-            ['other_models'],
+            ["other_models"],
             select(MyModel).join(OtherModel),
         ),
         (
@@ -65,12 +65,12 @@ def test_resolve_specific_columns(  # noqa
         ),
         (
             select(MyModel),
-            [(OtherModel, MyModel.id == OtherModel.my_model_id, {'isouter': True})],
+            [(OtherModel, MyModel.id == OtherModel.my_model_id, {"isouter": True})],
             select(MyModel).join(OtherModel, isouter=True),
         ),
         (
             select(MyModel),
-            [(OtherModel, MyModel.id == OtherModel.my_model_id, {'full': True})],
+            [(OtherModel, MyModel.id == OtherModel.my_model_id, {"full": True})],
             select(MyModel).join(OtherModel, full=True),
         ),
     ],
@@ -86,18 +86,18 @@ def test_resolve_and_apply_joins(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('stmt', 'strategy', 'loads', 'expected_result'),
+    ("stmt", "strategy", "loads", "expected_result"),
     [
         (
             select(MyModel),
             joinedload,
-            ['other_models'],
+            ["other_models"],
             select(MyModel).options(joinedload(MyModel.other_models)),
         ),
         (
             select(MyModel),
             selectinload,
-            ['other_models'],
+            ["other_models"],
             select(MyModel).options(selectinload(MyModel.other_models)),
         ),
     ],
@@ -116,18 +116,18 @@ def test_resolve_and_apply_loads(  # noqa
 def test_resolve_and_apply_loads_incorrect():  # noqa
     query = BaseQuery(SimpleFilterConverter)
     with pytest.raises(NoModelRelationshipError):
-        query._resolve_and_apply_loads(stmt=select(MyModel), loads=['incorrect'])  # type: ignore
+        query._resolve_and_apply_loads(stmt=select(MyModel), loads=["incorrect"])  # type: ignore
 
 
 @pytest.mark.parametrize(
     (
-        'id_field',
-        'ids_to_disable',
-        'disable_field',
-        'field_type',
-        'allow_filter_by_value',
-        'extra_filters',
-        'expected_result',
+        "id_field",
+        "ids_to_disable",
+        "disable_field",
+        "field_type",
+        "allow_filter_by_value",
+        "extra_filters",
+        "expected_result",
     ),
     [
         (
@@ -145,8 +145,8 @@ def test_resolve_and_apply_loads_incorrect():  # noqa
             MyModel.dt,
             datetime.datetime,
             False,
-            {'name': 'aboba'},
-            [MyModel.id.in_({1, 2, 3, 4, 5}), MyModel.name == 'aboba'],
+            {"name": "aboba"},
+            [MyModel.id.in_({1, 2, 3, 4, 5}), MyModel.name == "aboba"],
         ),
         (
             MyModel.id,
@@ -191,25 +191,25 @@ def test_make_disable_filters(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('search', 'search_by_args', 'use_and_clause', 'expected_result'),
+    ("search", "search_by_args", "use_and_clause", "expected_result"),
     [
         (
-            'value',
+            "value",
             (MyModel.name, MyModel.other_name),
             False,
-            or_(MyModel.name.ilike(r'%value%'), MyModel.other_name.ilike(r'%value%')),
+            or_(MyModel.name.ilike(r"%value%"), MyModel.other_name.ilike(r"%value%")),
         ),
         (
-            'value',
+            "value",
             (MyModel.name, MyModel.other_name),
             True,
-            and_(MyModel.name.ilike(r'%value%'), MyModel.other_name.ilike(r'%value%')),
+            and_(MyModel.name.ilike(r"%value%"), MyModel.other_name.ilike(r"%value%")),
         ),
         (
-            'value',
-            ('name', 'other_name'),
+            "value",
+            ("name", "other_name"),
             False,
-            or_(MyModel.name.ilike(r'%value%'), MyModel.other_name.ilike(r'%value%')),
+            or_(MyModel.name.ilike(r"%value%"), MyModel.other_name.ilike(r"%value%")),
         ),
     ],
 )
@@ -230,7 +230,7 @@ def test_make_search_filter(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('filters', 'joins', 'loads', 'expected_result'),
+    ("filters", "joins", "loads", "expected_result"),
     [
         (
             None,
@@ -239,21 +239,21 @@ def test_make_search_filter(  # noqa
             select(MyModel),
         ),
         (
-            {'name': 'aboba'},
+            {"name": "aboba"},
             None,
             None,
-            select(MyModel).where(MyModel.name == 'aboba'),
+            select(MyModel).where(MyModel.name == "aboba"),
         ),
         (
             None,
-            ['other_models'],
+            ["other_models"],
             None,
             select(MyModel).join(OtherModel),
         ),
         (
             None,
             None,
-            ['other_models'],
+            ["other_models"],
             select(MyModel).options(joinedload(MyModel.other_models)),
         ),
     ],
@@ -275,7 +275,7 @@ def test_get_item_stmt(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('filters', 'joins', 'expected_result'),
+    ("filters", "joins", "expected_result"),
     [
         (
             None,
@@ -283,22 +283,22 @@ def test_get_item_stmt(  # noqa
             select(func.count()).select_from(MyModel),
         ),
         (
-            {'name': 'aboba'},
+            {"name": "aboba"},
             None,
-            select(func.count()).select_from(MyModel).where(MyModel.name == 'aboba'),
+            select(func.count()).select_from(MyModel).where(MyModel.name == "aboba"),
         ),
         (
             None,
-            ['other_models'],
+            ["other_models"],
             select(func.count()).select_from(MyModel).join(OtherModel),
         ),
         (
-            [OtherModel.name == 'aboba'],
-            ['other_models'],
+            [OtherModel.name == "aboba"],
+            ["other_models"],
             select(func.count())
             .select_from(MyModel)
             .join(OtherModel)
-            .where(OtherModel.name == 'aboba'),
+            .where(OtherModel.name == "aboba"),
         ),
     ],
 )
@@ -318,15 +318,15 @@ def test_get_items_count_stmt(  # noqa
 
 @pytest.mark.parametrize(
     (
-        'joins',
-        'loads',
-        'filters',
-        'search',
-        'search_by',
-        'order_by',
-        'limit',
-        'offset',
-        'expected_result',
+        "joins",
+        "loads",
+        "filters",
+        "search",
+        "search_by",
+        "order_by",
+        "limit",
+        "offset",
+        "expected_result",
     ),
     [
         (
@@ -344,7 +344,7 @@ def test_get_items_count_stmt(  # noqa
             None,
             None,
             None,
-            'some_value',
+            "some_value",
             None,
             None,
             None,
@@ -366,12 +366,12 @@ def test_get_items_count_stmt(  # noqa
             None,
             None,
             None,
-            'somevalue',
+            "somevalue",
             (MyModel.name,),
             None,
             None,
             None,
-            select(MyModel).where(MyModel.name.ilike(r'%somevalue%')),
+            select(MyModel).where(MyModel.name.ilike(r"%somevalue%")),
         ),
         (
             None,
@@ -379,10 +379,10 @@ def test_get_items_count_stmt(  # noqa
             None,
             None,
             None,
-            ('some_value',),
+            ("some_value",),
             None,
             None,
-            select(MyModel).order_by(text('some_value')),
+            select(MyModel).order_by(text("some_value")),
         ),
         (
             None,
@@ -436,20 +436,20 @@ def test_get_item_list_stmt(  # noqa
 
 @pytest.mark.parametrize(
     (
-        'data',
-        'filters',
-        'expected_result',
+        "data",
+        "filters",
+        "expected_result",
     ),
     [
         (
-            {'name': 25},
+            {"name": 25},
             None,
-            update(MyModel).values({'name': 25}).returning(MyModel),
+            update(MyModel).values({"name": 25}).returning(MyModel),
         ),
         (
-            {'name': 'aboba'},
-            {'name': 'aboba'},
-            update(MyModel).where(MyModel.name == 'aboba').values({'name': 25}).returning(MyModel),
+            {"name": "aboba"},
+            {"name": "aboba"},
+            update(MyModel).where(MyModel.name == "aboba").values({"name": 25}).returning(MyModel),
         ),
     ],
 )
@@ -468,10 +468,10 @@ def test_db_update_stmt(  # noqa
 
 
 @pytest.mark.parametrize(
-    ('filters', 'expected_result'),
+    ("filters", "expected_result"),
     [
         (None, delete(MyModel)),
-        ({'name': 'aboba'}, delete(MyModel).where(MyModel.name == 'aboba')),
+        ({"name": "aboba"}, delete(MyModel).where(MyModel.name == "aboba")),
     ],
 )
 def test_db_delete_stmt(filters: Any, expected_result: Any):  # noqa
@@ -486,13 +486,13 @@ def test_db_delete_stmt(filters: Any, expected_result: Any):  # noqa
 @freeze_time(now)
 @pytest.mark.parametrize(
     (
-        'ids_to_disable',
-        'id_field',
-        'disable_field',
-        'field_type',
-        'allow_filter_by_value',
-        'extra_filters',
-        'expected_result',
+        "ids_to_disable",
+        "id_field",
+        "disable_field",
+        "field_type",
+        "allow_filter_by_value",
+        "extra_filters",
+        "expected_result",
     ),
     [
         (

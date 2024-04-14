@@ -1,5 +1,5 @@
 [tool.ruff]
-select = [
+lint.select = [
     "A",
     "B",
     "D",
@@ -32,7 +32,7 @@ select = [
     "TRY",
 ]
 line-length = 100
-show-source = true
+output-format = "full"
 exclude = [
     ".git",
     "__pycache__",
@@ -45,19 +45,28 @@ exclude = [
     "alembic",
     "airich",
 ]
-ignore = ["D100", "B008", "D104", "Q000", "S101", "PT016", "ANN101", "ANN102"]
+lint.ignore = [
+    "D100",
+    "B008",
+    "D104",
+    "Q000",
+    "S101",
+    "PT016",
+    "ANN101",
+    "ANN102",
+]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "numpy"
 ignore-decorators = ["typing.overload"]
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 11
 
-[tool.ruff.flake8-bugbear]
+[tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
-[tool.ruff.extend-per-file-ignores]
+[tool.ruff.lint.extend-per-file-ignores]
 "__init__.py" = ["F401"]
 "*/migrations/versions/*" = ["D103"]
 "src/app/main.py" = ["E402"]
@@ -148,13 +157,16 @@ dev = [
 
 [project]
 name = "sqlrepo"
-version = "0.1.1"
+version = "0.2.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
-dependencies = ["sqlalchemy>=2.0.29", "python-dev-utils[filtering]>=0.1.1"]
+dependencies = [
+    "sqlalchemy>=2.0.29",
+    "python-dev-utils[sqlalchemy_filters]>=1.0.6",
+]
 
 
 [build-system]

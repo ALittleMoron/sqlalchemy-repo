@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 
-T = TypeVar('T', covariant=True)
+T = TypeVar("T", covariant=True)
 
 
 class SyncFactoryFunctionProtocol(Protocol[T]):
@@ -13,12 +13,11 @@ class SyncFactoryFunctionProtocol(Protocol[T]):
 
     @staticmethod
     def __call__(  # noqa: D102
-        session: 'Session',
+        session: "Session",
         *,
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
-    ) -> T:
-        ...
+    ) -> T: ...
 
 
 class AsyncFactoryFunctionProtocol(Protocol[T]):
@@ -26,9 +25,8 @@ class AsyncFactoryFunctionProtocol(Protocol[T]):
 
     @staticmethod
     async def __call__(  # noqa: D102
-        session: 'AsyncSession',
+        session: "AsyncSession",
         *,
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
-    ) -> T:
-        ...
+    ) -> T: ...

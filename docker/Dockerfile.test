@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm as development_build
+FROM python:3.11-slim-bookworm as development_build
 
 ARG YOUR_ENV
 
@@ -10,22 +10,18 @@ ENV YOUR_ENV=${YOUR_ENV} \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
     PIP_DEFAULT_TIMEOUT=100 \
     # Poetry's configuration:
-    POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    POETRY_CACHE_DIR='/var/cache/pypoetry' \
-    POETRY_HOME='/usr/local' \
-    POETRY_VERSION=1.8
+    PDM_CHECK_UPDATE=false
 
 # System deps:
 # RUN curl -sSL https://install.python-poetry.org | python3 -
 
 # Copy only requirements to cache them in docker layer
 WORKDIR /code
-RUN pip install poetry
-COPY ./poetry.lock ./pyproject.toml /code/
+RUN pip install pdm
+COPY ./pdm.lock ./pyproject.toml README.md /code/
 
 # Project initialization:
-RUN poetry install --no-root
+RUN pdm install -G:all
 
 # Creating folders, and files for a project:
 COPY . /code

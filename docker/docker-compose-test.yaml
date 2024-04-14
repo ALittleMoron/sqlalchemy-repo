@@ -27,6 +27,8 @@ services:
       dockerfile: ./docker/Dockerfile.test
     command:
       [
+        "pdm",
+        "run",
         "pytest",
         "./tests",
         "--cov-report",
