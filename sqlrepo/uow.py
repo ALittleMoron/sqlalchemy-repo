@@ -1,3 +1,5 @@
+"""Implementation of Unit of Work patterns."""
+
 import types
 from abc import ABC, abstractmethod
 from typing import Self
@@ -10,20 +12,26 @@ from sqlrepo.logging import logger
 
 
 class BaseAsyncUnitOfWork(ABC, Abstract):
+    """Base async unit of work pattern."""
+
     session_factory: "async_sessionmaker[AsyncSession]" = abstract_class_property(
         async_sessionmaker[AsyncSession],
     )
 
     @abstractmethod
     def init_repositories(self, session: "AsyncSession") -> None:
+        """Init repositories.
+
+        Define your own method for it and specify your own methods for working with repositories.
+        """
         raise NotImplementedError()
 
-    async def __aenter__(self) -> Self:
+    async def __aenter__(self) -> Self:  # noqa: D105
         self.session = self.session_factory()
         self.init_repositories(self.session)
         return self
 
-    async def __aexit__(
+    async def __aexit__(  # noqa: D105
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
@@ -37,36 +45,45 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
         await self.close()
 
     async def commit(self) -> None:
+        """Alias for session ``commit``."""
         if not self.session:
             return
         await self.session.commit()
 
     async def rollback(self) -> None:
+        """Alias for session ``rollback``."""
         if not self.session:
             return
         await self.session.rollback()
 
     async def close(self) -> None:
+        """Alias for session ``close``."""
         if not self.session:
             return
         await self.session.close()
 
 
 class BaseSyncUnitOfWork(ABC, Abstract):
+    """Base sync unit of work pattern."""
+
     session_factory: "sessionmaker[Session]" = abstract_class_property(
         sessionmaker[Session],
     )
 
     @abstractmethod
     def init_repositories(self, session: "Session") -> None:
+        """Init repositories.
+
+        Define your own method for it and specify your own methods for working with repositories.
+        """
         raise NotImplementedError()
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> Self:  # noqa: D105
         self.session = self.session_factory()
         self.init_repositories(self.session)
         return self
 
-    def __exit__(
+    def __exit__(  # noqa: D105
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
@@ -80,16 +97,19 @@ class BaseSyncUnitOfWork(ABC, Abstract):
         self.close()
 
     def commit(self) -> None:
+        """Alias for session ``commit``."""
         if not self.session:
             return
         self.session.commit()
 
     def rollback(self) -> None:
+        """Alias for session ``rollback``."""
         if not self.session:
             return
         self.session.rollback()
 
     def close(self) -> None:
+        """Alias for session ``close``."""
         if not self.session:
             return
         self.session.close()

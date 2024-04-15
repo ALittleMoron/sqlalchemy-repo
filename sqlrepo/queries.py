@@ -1,3 +1,5 @@
+"""Queries classes with executable statements and methods with them."""
+
 import datetime
 import re
 from collections.abc import Callable
@@ -10,9 +12,8 @@ from dev_utils.sqlalchemy.utils import (  # type: ignore
     get_sqlalchemy_attribute,
     get_utc_now,
 )
-from sqlalchemy import CursorResult, and_, delete
+from sqlalchemy import CursorResult, and_, delete, func, or_, select, text, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy import func, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
 from sqlrepo.logging import logger as default_logger
@@ -329,6 +330,7 @@ class BaseSyncQuery(BaseQuery):
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model by given filters."""
         stmt = self._get_item_stmt(
             model=model,
             filters=filters,
@@ -345,6 +347,7 @@ class BaseSyncQuery(BaseQuery):
         joins: "Sequence[Join] | None" = None,
         filters: "Filter | None" = None,
     ) -> int:
+        """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
             model=model,
             joins=joins,
@@ -370,6 +373,7 @@ class BaseSyncQuery(BaseQuery):
         offset: int | None = None,
         unique_items: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model."""
         stmt = self._get_item_list_stmt(
             model=model,
             joins=joins,
@@ -394,6 +398,7 @@ class BaseSyncQuery(BaseQuery):
         data: "DataDict | None" = None,
         use_flush: bool = False,
     ) -> "BaseSQLAlchemyModel":
+        """Create model instance from given data."""
         item = model() if data is None else model(**data)
         self.session.add(item)
         if use_flush:
@@ -416,6 +421,7 @@ class BaseSyncQuery(BaseQuery):
         filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Update model from given data."""
         stmt = self._db_update_stmt(
             model=model,
             data=data,
@@ -438,6 +444,10 @@ class BaseSyncQuery(BaseQuery):
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
         use_flush: bool = False,
     ) -> "tuple[Updated, BaseSQLAlchemyModel]":
+        """Update model instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
@@ -469,6 +479,7 @@ class BaseSyncQuery(BaseQuery):
         filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Count":
+        """Delete model in db by given filters."""
         stmt = self._db_delete_stmt(
             model=model,
             filters=filters,
@@ -488,6 +499,7 @@ class BaseSyncQuery(BaseQuery):
         item: "Base",
         use_flush: bool = False,
     ) -> "Deleted":
+        """Delete model_class instance."""
         item_repr = repr(item)
         try:
             self.session.delete(item)
@@ -516,6 +528,7 @@ class BaseSyncQuery(BaseQuery):
         extra_filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Count":
+        """Disable model instances with given ids and extra_filters."""
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
@@ -559,6 +572,7 @@ class BaseAsyncQuery(BaseQuery):
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model by given filters."""
         stmt = self._get_item_stmt(
             model=model,
             filters=filters,
@@ -575,6 +589,7 @@ class BaseAsyncQuery(BaseQuery):
         joins: "Sequence[Join] | None" = None,
         filters: "Filter | None" = None,
     ) -> int:
+        """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
             model=model,
             joins=joins,
@@ -600,6 +615,7 @@ class BaseAsyncQuery(BaseQuery):
         offset: int | None = None,
         unique_items: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model."""
         stmt = self._get_item_list_stmt(
             model=model,
             joins=joins,
@@ -623,6 +639,7 @@ class BaseAsyncQuery(BaseQuery):
         data: "DataDict | None" = None,
         use_flush: bool = False,
     ) -> "BaseSQLAlchemyModel":
+        """Create model instance from given data."""
         item = model() if data is None else model(**data)
         self.session.add(item)
         if use_flush:
@@ -645,6 +662,7 @@ class BaseAsyncQuery(BaseQuery):
         filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
+        """Update model from given data."""
         stmt = self._db_update_stmt(
             model=model,
             data=data,
@@ -666,6 +684,10 @@ class BaseAsyncQuery(BaseQuery):
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
         use_flush: bool = False,
     ) -> "tuple[bool, BaseSQLAlchemyModel]":
+        """Update model instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
@@ -697,6 +719,7 @@ class BaseAsyncQuery(BaseQuery):
         filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Count":
+        """Delete model in db by given filters."""
         stmt = self._db_delete_stmt(
             model=model,
             filters=filters,
@@ -716,6 +739,7 @@ class BaseAsyncQuery(BaseQuery):
         item: "Base",
         use_flush: bool = False,
     ) -> "Deleted":
+        """Delete model_class instance."""
         item_repr = repr(item)
         try:
             await self.session.delete(item)
@@ -744,6 +768,7 @@ class BaseAsyncQuery(BaseQuery):
         extra_filters: "Filter | None" = None,
         use_flush: bool = False,
     ) -> "Count":
+        """Disable model instances with given ids and extra_filters."""
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,

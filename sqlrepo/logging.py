@@ -1,3 +1,5 @@
+"""Logging configuration for sqlrepo project."""
+
 import logging
 import logging.config
 

@@ -1,3 +1,5 @@
+"""Main implementations for sqlrepo project."""
+
 import datetime
 import warnings
 from collections.abc import Callable
@@ -23,7 +25,7 @@ from dev_utils.sqlalchemy.filters.converters import (  # type: ignore
 )
 from dev_utils.sqlalchemy.filters.types import FilterConverterStrategiesLiteral  # type: ignore
 from sqlalchemy.orm import DeclarativeBase as Base
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from sqlrepo import exc as sqlrepo_exc
 from sqlrepo.logging import logger as default_logger
@@ -47,6 +49,7 @@ if TYPE_CHECKING:
         full: NotRequired[bool]
 
     Count = int
+    Deleted = bool
     Model = type[Base]
     JoinClause = ColumnElement[bool]
     ModelWithOnclause = tuple[Model, JoinClause]
@@ -71,9 +74,33 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     """
 
     __inheritance_check_model_class__: bool = True
-    _model_class: type["BaseSQLAlchemyModel"]
+    """
+    Private custom magic property.
 
-    # TODO: добавить specific_column_mapping в фильтры, joins и loads.
+    Use it, if you want to inherit Repository without checking model_class attribute.
+    """
+
+    model_class: type["BaseSQLAlchemyModel"]
+    """
+    Model class for repository.
+
+    You can set this option manually, but it is not recommended. Repository will automatically
+    add model_class attribute by extracting it from Generic type.
+
+    Use case:
+
+    ```
+    from my_package.models import Admin
+
+    class AdminRepository(BaseSyncRepository[Admin]):
+        pass
+
+    # So, when you will use AdminRepository, model_class attribute will be set with Admin
+    # automatically.
+    ```
+    """
+
+    # TODO: add specific_column_mapping to filters, joins and loads.
     specific_column_mapping: ClassVar["dict[str, ColumnElement[Any]]"] = {}
     """
     Uses as mapping for some attributes, that you need to alias or need to specify column
@@ -93,6 +120,26 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     If you will work with repositories as single methods uses, switch to use_flush=False. It will
     make queries commit any changes.
     """
+    update_set_none: ClassVar[bool] = False
+    """
+    Uses as flag of set None option in ``update_instance`` method.
+
+    If True, allow to force ``update_instance`` instance columns with None value. Works together
+    with ``update_allowed_none_fields``.
+
+    By default False, because it's not safe to set column to None - current version if sqlrepo
+    not able to check optional type. Will be added in next versions, and ``then update_set_none``
+    will be not necessary.
+    """
+    update_allowed_none_fields: ClassVar['Literal["*"] | set[StrField]'] = "*"
+    """
+    Set of strings, which represents columns of model.
+
+    Uses as include or exclude for given data in ``update_instance`` method.
+
+    By default allow any fields. Not dangerous, because ``update_set_none`` by default set to False,
+    and there will be no affect on ``update_instance`` method
+    """
     allow_disable_filter_by_value: ClassVar[bool] = True
     """
     Uses as flag of filtering in disable method.
@@ -105,14 +152,66 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     some cases (like datetime disable field) it may be better to turn off this flag to save disable
     with new context (repeat disable, if your domain supports repeat disable and it make sense).
     """
-    update_set_none: ClassVar[bool] = False
-    update_allowed_none_fields: ClassVar['Literal["*"] | set[StrField]'] = "*"
-    disable_field_type: ClassVar[type[datetime.datetime] | type[bool]] = datetime.datetime
-    unique_list_items: ClassVar[bool] = False
-    filter_convert_strategy: ClassVar[FilterConverterStrategiesLiteral] = "simple"
-    load_strategy: ClassVar[Callable[..., "_AbstractLoad"]] = joinedload
-    id_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    disable_field_type: ClassVar[type[datetime.datetime] | type[bool] | None] = None
+    """
+    Uses as choice of type of disable field.
+
+    By default, None. Needs to be set manually, because this option depends on user custom
+    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
+    RepositoryAttributeError exception raised by Repository class.
+    """
     disable_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    """
+    Uses as choice of used defined disable field.
+
+    By default, None. Needs to be set manually, because this option depends on user custom
+    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
+    RepositoryAttributeError exception raised by Repository class.
+    """
+    id_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    """
+    Uses as choice of used defined id field in model, which supports disable.
+
+    By default, None. Needs to be set manually, because this option depends on user custom
+    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
+    RepositoryAttributeError exception raised by Repository class.
+    """
+    unique_list_items: ClassVar[bool] = True
+    """
+    Warning! Ambiguous option!
+    ==========================
+
+    Current version of ``sqlrepo`` works with load strategies with user configured option
+    ``load_strategy``. In order to make ``list`` method works stable, this option is used.
+    If you don't work with relationships in your model or you don't need unique (for example,
+    if you use selectinload), set this option to False. Otherwise keep it in True state.
+    """
+    filter_convert_strategy: ClassVar[FilterConverterStrategiesLiteral] = "simple"
+    """
+    Uses as choice of filter convert.
+
+    By default "simple", so you able to pass filters with ``key-value`` structure. You still can
+    pass raw filters (just list of SQLAlchemy filters), but if you pass dict, it will be converted
+    to SQLAlchemy filters with passed strategy.
+
+    Currently, supported converters:
+
+        ``simple`` - ``key-value`` dict.
+
+        ``advanced`` - dict with ``field``, ``value`` and ``operator`` keys.
+        List of operators:
+
+            ``=, >, <, >=, <=, is, is_not, between, contains``
+
+        ``django-like`` - ``key-value`` dict with django-like lookups system. See django docs for
+        more info.
+    """
+    load_strategy: ClassVar[Callable[..., "_AbstractLoad"]] = selectinload
+    """
+    Uses as choice of SQLAlchemy load strategies.
+
+    By default selectinload, because it makes less errors.
+    """
 
     _filter_convert_classes: Final[
         dict[FilterConverterStrategiesLiteral, type[BaseFilterConverter]]
@@ -121,12 +220,27 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
         "advanced": AdvancedOperatorFilterConverter,
         "django": DjangoLikeFilterConverter,
     }
+    """
+    Final convert class filters mapping.
+
+    Don't override it, because it can makes unexpected errors.
+    """
+
+    @classmethod
+    def _validate_disable_attributes(cls) -> None:
+        if cls.id_field is None or cls.disable_field is None or cls.disable_field_type is None:
+            msg = (
+                'Attribute "id_field" or "disable_field" or "disable_field_type" not set in '
+                "your repository class. Can't disable entities."
+            )
+            raise sqlrepo_exc.RepositoryAttributeError(msg)
 
     def __init_subclass__(cls) -> None:  # noqa: D105
-        if hasattr(cls, "_model_class"):
+        if hasattr(cls, "model_class"):
             msg = (
-                "Don't change _model_class attribute to class. Use generic syntax instead. "
-                "See PEP 646 (https://peps.python.org/pep-0646/)"
+                "Don't change model_class attribute to class. Use generic syntax instead. "
+                "See PEP 646 (https://peps.python.org/pep-0646/). Repository will automatically "
+                "add model_class attribute by extracting it from Generic type."
             )
             warnings.warn(msg, stacklevel=2)
             return
@@ -160,7 +274,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             msg = "Passed GenericType is not SQLAlchemy model declarative class."
             warnings.warn(msg, stacklevel=2)
             return
-        cls._model_class = model  # type: ignore
+        cls.model_class = model  # type: ignore
 
     def get_filter_convert_class(self) -> type[BaseFilterConverter]:
         """Get filter convert class from passed strategy."""
@@ -193,13 +307,14 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     async def get(
         self,
+        filters: "Filter",
         *,
-        filters: "Filter | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model_class by given filters."""
         result = await self.queries.get_item(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             loads=loads,
             filters=filters,
@@ -209,11 +324,12 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def count(
         self,
         *,
-        joins: "Sequence[Join] | None" = None,
         filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
     ) -> int:
+        """Get count of instances of model_class by given filters."""
         result = await self.queries.get_items_count(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             filters=filters,
         )
@@ -223,17 +339,18 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         # TODO: улучшить интерфейс, чтобы можно было принимать как 1 элемент, так и несколько
+        filters: "Filter | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
-        filters: "Filter | None" = None,
         search: str | None = None,
         search_by: "Sequence[SearchParam] | None" = None,
         order_by: "Sequence[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model_class."""
         result = await self.queries.get_item_list(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             loads=loads,
             filters=filters,
@@ -246,13 +363,15 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         )
         return result
 
+    # TODO: def create - insert stmt execute
+
     async def create_instance(
         self,
-        *,
         data: "DataDict | None" = None,
     ) -> "BaseSQLAlchemyModel":
+        """Create model_class instance from given data."""
         result = await self.queries.create_item(
-            model=self._model_class,
+            model=self.model_class,
             data=data,
             use_flush=self.use_flush,
         )
@@ -264,8 +383,9 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         data: "DataDict",
         filters: "Filter | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
+        """Update model_class from given data."""
         result = await self.queries.db_update(
-            model=self._model_class,
+            model=self.model_class,
             data=data,
             filters=filters,
             use_flush=self.use_flush,
@@ -278,11 +398,39 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
     ) -> "tuple[bool, BaseSQLAlchemyModel]":
+        """Update model_class instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
         result = await self.queries.change_item(
             data=data,
             item=instance,
             set_none=self.update_set_none,
             allowed_none_fields=self.update_allowed_none_fields,
+            use_flush=self.use_flush,
+        )
+        return result
+
+    async def delete(
+        self,
+        filters: "Filter | None" = None,
+    ) -> "Count":
+        """Delete model_class in db by given filters."""
+        result = await self.queries.db_delete(
+            model=self.model_class,
+            filters=filters,
+            use_flush=self.use_flush,
+        )
+        return result
+
+    async def delete_item(
+        self,
+        *,
+        instance: "BaseSQLAlchemyModel",
+    ) -> "Deleted":
+        """Delete model_class instance."""
+        result = await self.queries.delete_item(
+            item=instance,
             use_flush=self.use_flush,
         )
         return result
@@ -293,18 +441,14 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         ids_to_disable: set[Any],
         extra_filters: "Filter | None" = None,
     ) -> "Count":
-        if self.id_field is None or self.disable_field is None:
-            msg = (
-                'Attribute "id_field" or "disable_field" not set in your repository class. '
-                "Can't disable entities."
-            )
-            raise sqlrepo_exc.RepositoryAttributeError(msg)
+        """Disable model_class instances with given ids and extra_filters."""
+        self._validate_disable_attributes()
         result = await self.queries.disable_items(
-            model=self._model_class,
+            model=self.model_class,
             ids_to_disable=ids_to_disable,
-            id_field=self.id_field,
-            disable_field=self.disable_field,
-            field_type=self.disable_field_type,
+            id_field=self.id_field,  # type: ignore
+            disable_field=self.disable_field,  # type: ignore
+            field_type=self.disable_field_type,  # type: ignore
             allow_filter_by_value=self.allow_disable_filter_by_value,
             extra_filters=extra_filters,
             use_flush=self.use_flush,
@@ -336,13 +480,14 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     def get(
         self,
+        filters: "Filter",
         *,
-        filters: "Filter | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model_class by given filters."""
         result = self.queries.get_item(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             loads=loads,
             filters=filters,
@@ -355,8 +500,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         joins: "Sequence[Join] | None" = None,
         filters: "Filter | None" = None,
     ) -> int:
+        """Get count of instances of model_class by given filters."""
         result = self.queries.get_items_count(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             filters=filters,
         )
@@ -375,8 +521,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model_class."""
         result = self.queries.get_item_list(
-            model=self._model_class,
+            model=self.model_class,
             joins=joins,
             loads=loads,
             filters=filters,
@@ -389,13 +536,16 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         )
         return result
 
+    # TODO: async def create - insert stmt execute
+
     async def create_instance(
         self,
         *,
         data: "DataDict | None" = None,
     ) -> "BaseSQLAlchemyModel":
+        """Create model_class instance from given data."""
         result = self.queries.create_item(
-            model=self._model_class,
+            model=self.model_class,
             data=data,
             use_flush=self.use_flush,
         )
@@ -407,8 +557,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         data: "DataDict",
         filters: "Filter | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
+        """Update model_class from given data."""
         result = self.queries.db_update(
-            model=self._model_class,
+            model=self.model_class,
             data=data,
             filters=filters,
             use_flush=self.use_flush,
@@ -421,11 +572,39 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
     ) -> "tuple[bool, BaseSQLAlchemyModel]":
+        """Update model_class instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
         result = self.queries.change_item(
             data=data,
             item=instance,
             set_none=self.update_set_none,
             allowed_none_fields=self.update_allowed_none_fields,
+            use_flush=self.use_flush,
+        )
+        return result
+
+    def delete(
+        self,
+        filters: "Filter | None" = None,
+    ) -> "Count":
+        """Delete model_class in db by given filters."""
+        result = self.queries.db_delete(
+            model=self.model_class,
+            filters=filters,
+            use_flush=self.use_flush,
+        )
+        return result
+
+    def delete_item(
+        self,
+        *,
+        instance: "BaseSQLAlchemyModel",
+    ) -> "Deleted":
+        """Delete model_class instance."""
+        result = self.queries.delete_item(
+            item=instance,
             use_flush=self.use_flush,
         )
         return result
@@ -436,18 +615,13 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         ids_to_disable: set[Any],
         extra_filters: "Filter | None" = None,
     ) -> "Count":
-        if self.id_field is None or self.disable_field is None:
-            msg = (
-                'Attribute "id_field" or "disable_field" not set in your repository class. '
-                "Can't disable entities."
-            )
-            raise sqlrepo_exc.RepositoryAttributeError(msg)
+        """Disable model_class instances with given ids and extra_filters."""
         result = self.queries.disable_items(
-            model=self._model_class,
+            model=self.model_class,
             ids_to_disable=ids_to_disable,
-            id_field=self.id_field,
-            disable_field=self.disable_field,
-            field_type=self.disable_field_type,
+            id_field=self.id_field,  # type: ignore
+            disable_field=self.disable_field,  # type: ignore
+            field_type=self.disable_field_type,  # type: ignore
             allow_filter_by_value=self.allow_disable_filter_by_value,
             extra_filters=extra_filters,
             use_flush=self.use_flush,
