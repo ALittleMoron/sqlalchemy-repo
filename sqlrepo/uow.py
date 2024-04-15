@@ -14,6 +14,7 @@ from sqlrepo.logging import logger
 class BaseAsyncUnitOfWork(ABC, Abstract):
     """Base async unit of work pattern."""
 
+    __skip_session_use__: bool = False
     session_factory: "async_sessionmaker[AsyncSession]" = abstract_class_property(
         async_sessionmaker[AsyncSession],
     )
@@ -46,19 +47,19 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 
     async def commit(self) -> None:
         """Alias for session ``commit``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         await self.session.commit()
 
     async def rollback(self) -> None:
         """Alias for session ``rollback``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         await self.session.rollback()
 
     async def close(self) -> None:
         """Alias for session ``close``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         await self.session.close()
 
@@ -66,6 +67,7 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 class BaseSyncUnitOfWork(ABC, Abstract):
     """Base sync unit of work pattern."""
 
+    __skip_session_use__: bool = False
     session_factory: "sessionmaker[Session]" = abstract_class_property(
         sessionmaker[Session],
     )
@@ -98,18 +100,18 @@ class BaseSyncUnitOfWork(ABC, Abstract):
 
     def commit(self) -> None:
         """Alias for session ``commit``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         self.session.commit()
 
     def rollback(self) -> None:
         """Alias for session ``rollback``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         self.session.rollback()
 
     def close(self) -> None:
         """Alias for session ``close``."""
-        if not self.session:
+        if not self.session or self.__skip_session_use__:
             return
         self.session.close()

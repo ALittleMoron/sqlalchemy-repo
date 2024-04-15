@@ -165,7 +165,7 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "sqlalchemy>=2.0.29",
-    "python-dev-utils[sqlalchemy_filters]>=1.0.6",
+    "python-dev-utils[sqlalchemy_filters]>=1.1.0",
 ]
 
 

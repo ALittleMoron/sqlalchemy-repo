@@ -103,6 +103,8 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     # TODO: add specific_column_mapping to filters, joins and loads.
     specific_column_mapping: ClassVar["dict[str, ColumnElement[Any]]"] = {}
     """
+    Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.
+
     Uses as mapping for some attributes, that you need to alias or need to specify column
     from other models.
 
@@ -168,7 +170,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     implementation of disable_field. If None and ``disable`` method was evaluated, there will be
     RepositoryAttributeError exception raised by Repository class.
     """
-    id_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    disable_id_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
     """
     Uses as choice of used defined id field in model, which supports disable.
 
@@ -228,10 +230,14 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
 
     @classmethod
     def _validate_disable_attributes(cls) -> None:
-        if cls.id_field is None or cls.disable_field is None or cls.disable_field_type is None:
+        if (
+            cls.disable_id_field is None
+            or cls.disable_field is None
+            or cls.disable_field_type is None
+        ):
             msg = (
-                'Attribute "id_field" or "disable_field" or "disable_field_type" not set in '
-                "your repository class. Can't disable entities."
+                'Attribute "disable_id_field" or "disable_field" or "disable_field_type" not '
+                "set in your repository class. Can't disable entities."
             )
             raise sqlrepo_exc.RepositoryAttributeError(msg)
 
@@ -446,7 +452,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         result = await self.queries.disable_items(
             model=self.model_class,
             ids_to_disable=ids_to_disable,
-            id_field=self.id_field,  # type: ignore
+            id_field=self.disable_id_field,  # type: ignore
             disable_field=self.disable_field,  # type: ignore
             field_type=self.disable_field_type,  # type: ignore
             allow_filter_by_value=self.allow_disable_filter_by_value,
@@ -619,7 +625,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         result = self.queries.disable_items(
             model=self.model_class,
             ids_to_disable=ids_to_disable,
-            id_field=self.id_field,  # type: ignore
+            id_field=self.disable_id_field,  # type: ignore
             disable_field=self.disable_field,  # type: ignore
             field_type=self.disable_field_type,  # type: ignore
             allow_filter_by_value=self.allow_disable_filter_by_value,
