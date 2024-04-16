@@ -12,6 +12,7 @@ lint.select = [
     "C90",
     "UP",
     "ANN",
+    "PLR",
     "ASYNC",
     "FBT",
     "COM",
@@ -157,7 +158,7 @@ dev = [
 
 [project]
 name = "sqlrepo"
-version = "1.0.1"
+version = "1.0.2"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"
@@ -165,7 +166,7 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "sqlalchemy>=2.0.29",
-    "python-dev-utils[sqlalchemy_filters]>=1.1.0",
+    "python-dev-utils[sqlalchemy_filters]>=1.2.3",
 ]
 
 

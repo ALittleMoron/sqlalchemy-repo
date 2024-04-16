@@ -4,7 +4,7 @@ import types
 from abc import ABC, abstractmethod
 from typing import Self
 
-from dev_utils.core.abstract import Abstract, abstract_class_property  # type: ignore
+from dev_utils.core.abstract import Abstract, abstract_class_property
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session, sessionmaker
 

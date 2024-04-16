@@ -228,6 +228,10 @@ Be careful, when you work with Unit of work pattern. For stable work use `expire
 in your sessionmaker or make sure, that your repositories has option `use_flush = True` to avoid
 problems with `session.commit`.
 
+Be sure, you passed `session_factory` in class body, otherwise it will
+cause TypeError. `session_factory` is abstract class property. It must
+be set or Unit of work will not work.
+
 By default Unit of work will make commit on context manager exit, but you can specify
 `__skip_session_use__ = True` for your Unit of work class like this:
 
