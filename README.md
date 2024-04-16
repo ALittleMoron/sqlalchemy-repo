@@ -4,7 +4,7 @@
 
 ## Install
 
-sqlrepo project doesn't has optional dependencies, so you can istall it just as regular:
+sqlrepo project doesn't has optional dependencies, so you can install it just as regular:
 
 With pip:
 
