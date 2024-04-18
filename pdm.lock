@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:ad17db767f9e2d85181ad44384eb756f5acb428a92203c942abcdde54d895710"
+content_hash = "sha256:4e924ec2336aa857207238251b2574073bad596578816c7aebb946e68461a4c5"
 
 [[package]]
 name = "anyio"
@@ -722,29 +722,29 @@ files = [
 
 [[package]]
 name = "python-dev-utils"
-version = "1.2.3"
+version = "1.3.0"
 requires_python = ">=3.11"
 summary = "My project utils package, that I use in my projects."
 groups = ["default"]
 files = [
-    {file = "python_dev_utils-1.2.3-py3-none-any.whl", hash = "sha256:7ae9d15ef89606f9cacf676935394cd59a32474b1bc202ca916314586a89233d"},
-    {file = "python_dev_utils-1.2.3.tar.gz", hash = "sha256:e93dd230bc79af16485d6ca1c121b648bb6b2c772ece9a2a425b375942fb42cc"},
+    {file = "python_dev_utils-1.3.0-py3-none-any.whl", hash = "sha256:1d2163b503f60ae44cd8da234680f72f8dd1390668b07ec73c46f9bbf28d72e5"},
+    {file = "python_dev_utils-1.3.0.tar.gz", hash = "sha256:5fc87d8d4e2fe9b91be48e80850b3582747a5f1e393892b037b1c37a1350bee2"},
 ]
 
 [[package]]
 name = "python-dev-utils"
-version = "1.2.3"
+version = "1.3.0"
 extras = ["sqlalchemy_filters"]
 requires_python = ">=3.11"
 summary = "My project utils package, that I use in my projects."
 groups = ["default"]
 dependencies = [
-    "python-dev-utils==1.2.3",
+    "python-dev-utils==1.3.0",
     "sqlalchemy>=2.0.28",
 ]
 files = [
-    {file = "python_dev_utils-1.2.3-py3-none-any.whl", hash = "sha256:7ae9d15ef89606f9cacf676935394cd59a32474b1bc202ca916314586a89233d"},
-    {file = "python_dev_utils-1.2.3.tar.gz", hash = "sha256:e93dd230bc79af16485d6ca1c121b648bb6b2c772ece9a2a425b375942fb42cc"},
+    {file = "python_dev_utils-1.3.0-py3-none-any.whl", hash = "sha256:1d2163b503f60ae44cd8da234680f72f8dd1390668b07ec73c46f9bbf28d72e5"},
+    {file = "python_dev_utils-1.3.0.tar.gz", hash = "sha256:5fc87d8d4e2fe9b91be48e80850b3582747a5f1e393892b037b1c37a1350bee2"},
 ]
 
 [[package]]

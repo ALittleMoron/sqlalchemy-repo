@@ -3,19 +3,17 @@
 import datetime
 import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar, overload
 
+from dev_utils.core.utils import get_utc_now
 from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
-from dev_utils.sqlalchemy.utils import (
-    apply_joins,
-    apply_loads,
-    get_sqlalchemy_attribute,
-    get_utc_now,
-)
-from sqlalchemy import CursorResult, and_, delete, func, or_, select, text, update
+from dev_utils.sqlalchemy.utils import apply_joins, apply_loads, get_sqlalchemy_attribute
+from sqlalchemy import CursorResult, and_, delete
 from sqlalchemy import exc as sqlalchemy_exc
+from sqlalchemy import func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
+from sqlrepo.exc import QueryError
 from sqlrepo.logging import logger as default_logger
 
 
@@ -37,7 +35,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm.session import Session
     from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore
     from sqlalchemy.sql._typing import _ColumnExpressionOrStrLabelArgument  # type: ignore
-    from sqlalchemy.sql.dml import Delete, ReturningUpdate, Update
+    from sqlalchemy.sql.dml import Delete, ReturningInsert, ReturningUpdate, Update
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
 
@@ -100,6 +98,12 @@ class BaseQuery:
         joins: "Sequence[Join]",
     ) -> "Select[tuple[T]]":
         """Resolve joins from strings."""
+        # FIXME: may cause situation, when user passed Join as tuple may cause error.
+        # (Model, Model.id == OtherModel.model_id)  # noqa: ERA001
+        # or
+        # (Model, Model.id == OtherModel.model_id, {"isouter": True})  # noqa: ERA001
+        if isinstance(joins, str):
+            joins = [joins]
         for join in joins:
             if isinstance(join, tuple | list):
                 target, clause, *kw_list = join
@@ -117,6 +121,8 @@ class BaseQuery:
         stmt: "Select[tuple[T]]",
         loads: "Sequence[Load]",
     ) -> "Select[tuple[T]]":
+        if isinstance(loads, str):
+            loads = [loads]
         for load in loads:
             stmt = (
                 apply_loads(stmt, load, load_strategy=self.load_strategy)
@@ -239,6 +245,35 @@ class BaseQuery:
         if offset is not None:
             stmt = stmt.offset(offset)
         return stmt
+
+    def _db_insert_stmt(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict] | None" = None,
+    ) -> "ReturningInsert[tuple[BaseSQLAlchemyModel]]":
+        """Generate SQLAlchemy stmt to insert data."""
+        stmt = insert(model)
+        stmt = stmt.values() if data is None else stmt.values(data)
+        stmt = stmt.returning(model)
+        return stmt
+
+    def _prepare_create_items(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict | None] | None" = None,
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Prepare items to create.
+
+        Initialize model instances by given data.
+        """
+        if isinstance(data, dict) or data is None:
+            data = [data]
+        items: list["BaseSQLAlchemyModel"] = []
+        for data_ele in data:
+            items.append(model() if data_ele is None else model(**data_ele))
+        return items
 
     def _db_update_stmt(
         self,
@@ -390,28 +425,88 @@ class BaseSyncQuery(BaseQuery):
             return result.unique().all()
         return result.all()
 
+    @overload
+    def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | None",
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "Sequence[DataDict]",
+        use_flush: bool = False,
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict] | None" = None,
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+        """Insert data to given model by given data."""
+        stmt = self._db_insert_stmt(model=model, data=data)
+        if isinstance(data, dict) or data is None:
+            result = self.session.scalar(stmt)
+        else:
+            result = self.session.scalars(stmt)
+            result = result.unique().all()
+        if use_flush:
+            self.session.flush()
+        else:
+            self.session.commit()
+        if not result:  # pragma: no coverage
+            msg = f'No data was insert for model "{model}" and data {data}.'
+            raise QueryError(msg)
+        return result
+
+    @overload
     def create_item(
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        # TODO: add sequence of data to make more than one object at the same time.
-        data: "DataDict | None" = None,
+        data: "DataDict | None",
         use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel":
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    def create_item(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "Sequence[DataDict | None]",
+        use_flush: bool = False,
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    def create_item(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict | None] | None" = None,
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model instance from given data."""
-        item = model() if data is None else model(**data)
-        self.session.add(item)
+        items = self._prepare_create_items(model=model, data=data)
+        self.session.add_all(items)
         if use_flush:
             self.session.flush()
         else:
             self.session.commit()
 
         msg = (
-            f"Create row in database. Item: {item}. "
+            f"Create row in database. Item: {items}. "
             f"{'Flush used.' if use_flush else 'Commit used.'}."
         )
         self.logger.debug(msg)
-        return item
+        if len(items) == 1:
+            return items[0]
+        return items
 
     def db_update(
         self,
@@ -438,7 +533,6 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         data: "DataDict",
-        # TODO: add sequence items to make more than one object update at the same time.
         item: "BaseSQLAlchemyModel",
         set_none: bool = False,
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
@@ -489,11 +583,11 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore
+        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
             return result.rowcount
-        return 0
+        return 0  # pragma: no coverage
 
-    def delete_item(
+    def delete_item(  # pragma: no coverage
         self,
         *,
         item: "Base",
@@ -538,16 +632,16 @@ class BaseSyncQuery(BaseQuery):
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,
         )
-        if isinstance(stmt, int):
+        if isinstance(stmt, int):  # pragma: no coverage
             return stmt
         result = self.session.execute(stmt)
         if use_flush:
             self.session.flush()
         else:
             self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore
+        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
             return result.rowcount
-        return 0
+        return 0  # pragma: no coverage
 
 
 class BaseAsyncQuery(BaseQuery):
@@ -632,27 +726,88 @@ class BaseAsyncQuery(BaseQuery):
             return result.unique().all()
         return result.all()
 
+    @overload
+    async def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | None",
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    async def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "Sequence[DataDict]",
+        use_flush: bool = False,
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    async def db_create(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict] | None" = None,
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+        """Insert data to given model by given data."""
+        stmt = self._db_insert_stmt(model=model, data=data)
+        if isinstance(data, dict) or data is None:
+            result = await self.session.scalar(stmt)
+        else:
+            result = await self.session.scalars(stmt)
+            result = result.unique().all()
+        if use_flush:
+            await self.session.flush()
+        else:
+            await self.session.commit()
+        if not result:  # pragma: no coverage
+            msg = f'No data was insert for model "{model}" and data {data}.'
+            raise QueryError(msg)
+        return result
+
+    @overload
     async def create_item(
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        data: "DataDict | None" = None,
+        data: "DataDict | None",
         use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel":
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    async def create_item(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "Sequence[DataDict | None]",
+        use_flush: bool = False,
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    async def create_item(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        data: "DataDict | Sequence[DataDict | None] | None" = None,
+        use_flush: bool = False,
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model instance from given data."""
-        item = model() if data is None else model(**data)
-        self.session.add(item)
+        items = self._prepare_create_items(model=model, data=data)
+        self.session.add_all(items)
         if use_flush:
             await self.session.flush()
         else:
             await self.session.commit()
 
         msg = (
-            f"Create row in database. Item: {item}. "
+            f"Create row in database. Items: {items}. "
             f"{'Flush used.' if use_flush else 'Commit used.'}."
         )
         self.logger.debug(msg)
-        return item
+        if len(items) == 1:
+            return items[0]
+        return items
 
     async def db_update(
         self,
@@ -661,7 +816,7 @@ class BaseAsyncQuery(BaseQuery):
         data: "DataDict",
         filters: "Filter | None" = None,
         use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+    ) -> "Sequence[BaseSQLAlchemyModel]":
         """Update model from given data."""
         stmt = self._db_update_stmt(
             model=model,
@@ -729,11 +884,11 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore
+        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
             return result.rowcount
-        return 0
+        return 0  # pragma: no coverage
 
-    async def delete_item(
+    async def delete_item(  # pragma: no coverage
         self,
         *,
         item: "Base",
@@ -778,13 +933,13 @@ class BaseAsyncQuery(BaseQuery):
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,
         )
-        if isinstance(stmt, int):
+        if isinstance(stmt, int):  # pragma: no coverage
             return stmt
         result = await self.session.execute(stmt)
         if use_flush:
             await self.session.flush()
         else:
             await self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore
+        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
             return result.rowcount
-        return 0
+        return 0  # pragma: no coverage

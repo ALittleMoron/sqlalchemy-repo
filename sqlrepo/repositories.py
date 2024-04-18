@@ -1,6 +1,7 @@
 """Main implementations for sqlrepo project."""
 
 import datetime
+import importlib
 import warnings
 from collections.abc import Callable
 from typing import (
@@ -15,6 +16,7 @@ from typing import (
     TypedDict,
     TypeVar,
     get_args,
+    overload,
 )
 
 from dev_utils.sqlalchemy.filters.converters import (
@@ -64,6 +66,10 @@ if TYPE_CHECKING:
 
 StrField = str
 BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
+
+
+class RepositoryModelClassIncorrectUseWarning(Warning):
+    """Warning about Repository model_class attribute incorrect usage."""
 
 
 class BaseRepository(Generic[BaseSQLAlchemyModel]):
@@ -242,13 +248,14 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             raise sqlrepo_exc.RepositoryAttributeError(msg)
 
     def __init_subclass__(cls) -> None:  # noqa: D105
+        super().__init_subclass__()
         if hasattr(cls, "model_class"):
             msg = (
                 "Don't change model_class attribute to class. Use generic syntax instead. "
                 "See PEP 646 (https://peps.python.org/pep-0646/). Repository will automatically "
                 "add model_class attribute by extracting it from Generic type."
             )
-            warnings.warn(msg, stacklevel=2)
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
         if cls.__inheritance_check_model_class__ is False:
             cls.__inheritance_check_model_class__ = True
@@ -258,33 +265,46 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             # NOTE: this code is needed for getting type from generic: Generic[int] -> int type
             # get_args get params from __orig_bases__, that contains Generic passed types.
             model, *_ = get_args(cls.__orig_bases__[0])  # type: ignore
-        except Exception as exc:
-            msg = f"Error during getting information about Generic types for {cls.__name__}."
-            raise sqlrepo_exc.RepositoryAttributeError(msg) from exc
+        except Exception as exc:  # pragma: no coverage
+            msg = (
+                f"Error during getting information about Generic types for {cls.__name__}. "
+                f"Original exception: {str(exc)}"
+            )
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
+            return
         if isinstance(model, ForwardRef):
             try:
-                model = eval(model.__forward_arg__)  # noqa: S307
+                repo_module = vars(cls).get("__module__")
+                if not repo_module:
+                    msg = (
+                        f"No attribute __module__ in {cls}. Can't import global context for "
+                        "ForwardRef resolving."
+                    )
+                    raise TypeError(msg)  # noqa: TRY301
+                model_globals = vars(importlib.import_module(repo_module))
+                model = eval(model.__forward_arg__, model_globals)  # noqa: S307
             except Exception as exc:
                 msg = (
                     "Can't evaluate ForwardRef of generic type. "
                     "Don't use type in generic with quotes. "
                     f"Original exception: {str(exc)}"
                 )
-                warnings.warn(msg, stacklevel=2)
+                warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
                 return
         if isinstance(model, TypeVar):
             msg = "GenericType was not passed for SQLAlchemy model declarative class."
-            warnings.warn(msg, stacklevel=2)
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
         if not issubclass(model, Base):
             msg = "Passed GenericType is not SQLAlchemy model declarative class."
-            warnings.warn(msg, stacklevel=2)
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
         cls.model_class = model  # type: ignore
 
-    def get_filter_convert_class(self) -> type[BaseFilterConverter]:
+    @classmethod
+    def get_filter_convert_class(cls) -> type[BaseFilterConverter]:
         """Get filter convert class from passed strategy."""
-        return self._filter_convert_classes[self.filter_convert_strategy]
+        return cls._filter_convert_classes[cls.filter_convert_strategy]
 
 
 class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
@@ -344,7 +364,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def list(  # noqa: A003
         self,
         *,
-        # TODO: улучшить интерфейс, чтобы можно было принимать как 1 элемент, так и несколько
         filters: "Filter | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
@@ -369,17 +388,29 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         )
         return result
 
-    # TODO: def create - insert stmt execute
-
-    async def create_instance(
+    @overload
+    async def create(
         self,
-        data: "DataDict | None" = None,
-    ) -> "BaseSQLAlchemyModel":
+        *,
+        data: "DataDict | None",
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    async def create(
+        self,
+        *,
+        data: "DataDict | Sequence[DataDict] | None",
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model_class instance from given data."""
-        result = await self.queries.create_item(
+        result = await self.queries.db_create(
             model=self.model_class,
             data=data,
-            use_flush=self.use_flush,
         )
         return result
 
@@ -419,24 +450,13 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     async def delete(
         self,
+        *,
         filters: "Filter | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         result = await self.queries.db_delete(
             model=self.model_class,
             filters=filters,
-            use_flush=self.use_flush,
-        )
-        return result
-
-    async def delete_item(
-        self,
-        *,
-        instance: "BaseSQLAlchemyModel",
-    ) -> "Deleted":
-        """Delete model_class instance."""
-        result = await self.queries.delete_item(
-            item=instance,
             use_flush=self.use_flush,
         )
         return result
@@ -486,8 +506,8 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     def get(
         self,
-        filters: "Filter",
         *,
+        filters: "Filter",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -514,10 +534,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         )
         return result
 
-    async def list(  # noqa: A003
+    def list(  # noqa: A003
         self,
         *,
-        # TODO: улучшить интерфейс, чтобы можно было принимать как 1 элемент, так и несколько
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
         filters: "Filter | None" = None,
@@ -542,22 +561,33 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         )
         return result
 
-    # TODO: async def create - insert stmt execute
-
-    async def create_instance(
+    @overload
+    def create(
         self,
         *,
-        data: "DataDict | None" = None,
-    ) -> "BaseSQLAlchemyModel":
+        data: "DataDict | None",
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    def create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    def create(
+        self,
+        *,
+        data: "DataDict | Sequence[DataDict] | None",
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model_class instance from given data."""
-        result = self.queries.create_item(
+        result = self.queries.db_create(
             model=self.model_class,
             data=data,
-            use_flush=self.use_flush,
         )
         return result
 
-    async def update(
+    def update(
         self,
         *,
         data: "DataDict",
@@ -593,24 +623,13 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     def delete(
         self,
+        *,
         filters: "Filter | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         result = self.queries.db_delete(
             model=self.model_class,
             filters=filters,
-            use_flush=self.use_flush,
-        )
-        return result
-
-    def delete_item(
-        self,
-        *,
-        instance: "BaseSQLAlchemyModel",
-    ) -> "Deleted":
-        """Delete model_class instance."""
-        result = self.queries.delete_item(
-            item=instance,
             use_flush=self.use_flush,
         )
         return result

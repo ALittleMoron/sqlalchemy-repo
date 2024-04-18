@@ -6,7 +6,7 @@ import pytest
 from dev_utils.core.exc import NoModelRelationshipError  # type: ignore
 from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # type: ignore
 from freezegun import freeze_time
-from sqlalchemy import ColumnElement, and_, delete, func, or_, select, text, update
+from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload, selectinload
 
 from sqlrepo.queries import BaseQuery
@@ -73,6 +73,11 @@ def test_resolve_specific_columns(  # noqa
             [(OtherModel, MyModel.id == OtherModel.my_model_id, {"full": True})],
             select(MyModel).join(OtherModel, full=True),
         ),
+        (
+            select(MyModel),
+            "other_models",
+            select(MyModel).join(OtherModel),
+        ),
     ],
 )
 def test_resolve_and_apply_joins(  # noqa
@@ -98,6 +103,12 @@ def test_resolve_and_apply_joins(  # noqa
             select(MyModel),
             selectinload,
             ["other_models"],
+            select(MyModel).options(selectinload(MyModel.other_models)),
+        ),
+        (
+            select(MyModel),
+            selectinload,
+            "other_models",
             select(MyModel).options(selectinload(MyModel.other_models)),
         ),
     ],
@@ -432,6 +443,37 @@ def test_get_item_list_stmt(  # noqa
         offset=offset,
     )
     assert str(get_item_list_stmt) == str(expected_result)
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_result"),
+    [
+        (None, insert(MyModel).values().returning(MyModel)),
+        ({"id": 1}, insert(MyModel).values({"id": 1}).returning(MyModel)),
+        ([{"id": 1}], insert(MyModel).values([{"id": 1}]).returning(MyModel)),
+    ],
+)
+def test_db_insert_stmt(data: Any, expected_result: Any) -> None:  # noqa: ANN401
+    query = BaseQuery(SimpleFilterConverter)
+    db_insert_stmt = query._db_insert_stmt(model=MyModel, data=data)  # type: ignore
+    assert str(db_insert_stmt) == str(expected_result)
+
+
+@pytest.mark.parametrize(
+    ("data", "expected_result"),
+    [
+        (None, [MyModel()]),
+        ({"id": 1}, [MyModel(id=1)]),
+        ([{"id": 1}, None], [MyModel(id=1), MyModel()]),
+        ([{"id": 1}, {"id": 2}], [MyModel(id=1), MyModel(id=2)]),
+    ],
+)
+def test_prepare_create_items(data: Any, expected_result: Any) -> None:  # noqa: ANN401
+    query = BaseQuery(SimpleFilterConverter)
+    prepared_values = query._prepare_create_items(model=MyModel, data=data)  # type: ignore
+    assert len(prepared_values) == len(expected_result)
+    for prepared, expected in zip(prepared_values, prepared_values, strict=True):
+        assert prepared.__dict__ == expected.__dict__
 
 
 @pytest.mark.parametrize(

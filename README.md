@@ -1,5 +1,7 @@
 # sqlrepo
 
+![coverage](./coverage.svg)
+
 >SQLAlchemy repository pattern.
 
 ## Install
@@ -85,6 +87,23 @@ from other models.
 
 Warning: if you specify column from other model, it may cause errors. For example, update
 doesn't use it for filters, because joins are not presents in update.
+
+Current implementation use these option in search_by and order_by params, if you pass them as
+strings.
+
+```python
+from my_package.models import Admin
+
+class AdminRepository(BaseSyncRepository[Admin]):
+    specific_column_mapping = {"custom_field": Admin.id, "other_field": Admin.name}
+
+
+admins = AdminRepository(session).list(
+    search='abc',
+    search_by="other_field",
+    order_by='custom_field',
+)
+```
 
 ### `use_flush`
 
@@ -217,7 +236,7 @@ class YourUnitOfWork(BaseAsyncUnitOfWork):
 
     # Your custom method, that works with your repositories and do business-logic.
     async def work_with_repo_together(self, model_id: int):
-        your_model_instance = await self.your_model_repo.get({'id': model_id})
+        your_model_instance = await self.your_model_repo.get(filters={'id': model_id})
         your_other_model_instance = await self.your_model_repo.list(
             filters={'your_model_id': model_id},
         )

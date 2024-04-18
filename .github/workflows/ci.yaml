@@ -15,15 +15,3 @@ jobs:
     with:
       coverage: true
       python-version: ${{ matrix.python-version }}
-  quality:
-    name: "Code quality check (${{ matrix.python-version }}"
-    needs:
-      - test
-    strategy:
-      fail-fast: true
-      matrix:
-        python-version: ["3.12"]
-        poetry-version: ["1.8"]
-    uses: ./.github/workflows/lint.yaml
-    with:
-      python-version: ${{ matrix.python-version }}

@@ -5,7 +5,7 @@ from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # typ
 from mimesis import Datetime, Locale, Text
 from sqlalchemy import func, select
 
-from sqlrepo.queries import BaseSyncQuery
+from sqlrepo.queries import BaseAsyncQuery
 from tests.utils import (
     MyModel,
     OtherModel,
@@ -18,85 +18,92 @@ from tests.utils import (
 )
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
+    from sqlalchemy.ext.asyncio import AsyncSession
 
-    from tests.types import SyncFactoryFunctionProtocol
+    from tests.types import AsyncFactoryFunctionProtocol
 
 
 text_faker = Text(locale=Locale.EN)
 dt_faker = Datetime(locale=Locale.EN)
 
 
-def test_get_item(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_item(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_item = query_obj.get_item(model=MyModel, filters=dict(id=item.id))
+    item = await mymodel_async_factory(db_async_session, commit=True)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_item = await query_obj.get_item(model=MyModel, filters=dict(id=item.id))
     assert db_item is not None, f"MyModel with id {item.id} not found in db."
     assert_compare_db_items(item, db_item)
 
 
-def test_get_item_not_found(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_item_not_found(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_item = query_obj.get_item(model=MyModel, filters=dict(id=item.id + 1))
+    item = await mymodel_async_factory(db_async_session, commit=True)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_item = await query_obj.get_item(model=MyModel, filters=dict(id=item.id + 1))
     assert db_item is None, f"MyModel with id {item.id + 1} was found in db (but it shouldn't)."
 
 
-def test_get_items_count(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_items_count(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     create_count = 3
     for _ in range(create_count):
-        mymodel_sync_factory(db_sync_session, commit=False)
-    db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    count = query_obj.get_items_count(model=MyModel)
+        await mymodel_async_factory(db_async_session, commit=False)
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    count = await query_obj.get_items_count(model=MyModel)
     assert count == create_count
 
 
-def test_get_items_count_with_filter(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_items_count_with_filter(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session, commit=False)
+    item = await mymodel_async_factory(db_async_session, commit=False)
     for _ in range(2):
-        mymodel_sync_factory(db_sync_session, commit=False)
-    db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    count = query_obj.get_items_count(model=MyModel, filters=dict(id=item.id))
+        await mymodel_async_factory(db_async_session, commit=False)
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    count = await query_obj.get_items_count(model=MyModel, filters=dict(id=item.id))
     assert count == 1
 
 
-def test_get_items_list(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_items_list(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
-    db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_items = list(query_obj.get_item_list(model=MyModel))
+    items = [await mymodel_async_factory(db_async_session, commit=False) for _ in range(3)]
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_items = list(await query_obj.get_item_list(model=MyModel))
     assert_compare_db_item_list(items, db_items)
 
 
 # TODO: fix test. Now it just clone of test_get_items_list (previous test). Needs to check unique
-def test_get_items_list_with_unique(  # noqa: D103
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+@pytest.mark.asyncio()
+async def test_get_items_list_with_unique(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
-    db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_items = list(query_obj.get_item_list(model=MyModel, unique_items=True))
+    items = [await mymodel_async_factory(db_async_session, commit=False) for _ in range(3)]
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_items = list(await query_obj.get_item_list(model=MyModel, unique_items=True))
     assert_compare_db_item_list(items, db_items)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("create_data", "use_flush"),
     [
@@ -137,18 +144,19 @@ def test_get_items_list_with_unique(  # noqa: D103
         ),
     ],
 )
-def test_db_create(
-    db_sync_session: "Session",
+async def test_db_create(
+    db_async_session: "AsyncSession",
     create_data: dict[str, Any],
     use_flush: bool,  # noqa: FBT001
 ) -> None:
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_item = query_obj.db_create(model=MyModel, data=create_data, use_flush=use_flush)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_item = await query_obj.db_create(model=MyModel, data=create_data, use_flush=use_flush)
     if not isinstance(db_item, MyModel):  # type: ignore
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("create_data", "use_flush"),
     [
@@ -208,18 +216,19 @@ def test_db_create(
         ),
     ],
 )
-def test_create_item(
-    db_sync_session: "Session",
+async def test_create_item(
+    db_async_session: "AsyncSession",
     create_data: dict[str, Any],
     use_flush: bool,  # noqa: FBT001
 ) -> None:
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_item = query_obj.create_item(model=MyModel, data=create_data, use_flush=use_flush)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_item = await query_obj.create_item(model=MyModel, data=create_data, use_flush=use_flush)
     if not isinstance(db_item, MyModel):  # type: ignore
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("update_data", "use_flush", "items_count"),
     [
@@ -255,21 +264,22 @@ def test_create_item(
         ),
     ],
 )
-def test_db_update(
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
-    update_data: dict[str, Any],
+async def test_db_update(
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
+    update_data: Any,  # noqa: ANN401
     use_flush: bool,  # noqa: FBT001
     items_count: int,
 ) -> None:
     for _ in range(items_count):
-        mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    db_item = query_obj.db_update(model=MyModel, data=update_data, use_flush=use_flush)
+        await mymodel_async_factory(db_async_session, commit=True)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    db_item = await query_obj.db_update(model=MyModel, data=update_data, use_flush=use_flush)
     assert len(db_item) == items_count
     assert_compare_db_item_list_with_dict(db_item, update_data, skip_keys_check=True)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("update_data", "use_flush", "expected_updated_flag"),
     [
@@ -300,20 +310,21 @@ def test_db_update(
         ),
     ],
 )
-def test_change_item(
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+async def test_change_item(
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
     update_data: dict[str, Any],
     use_flush: bool,  # noqa: FBT001
     expected_updated_flag: bool,  # noqa: FBT001
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    updated, db_item = query_obj.change_item(data=update_data, item=item, use_flush=use_flush)
+    item = await mymodel_async_factory(db_async_session)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    updated, db_item = await query_obj.change_item(data=update_data, item=item, use_flush=use_flush)
     assert expected_updated_flag is updated
     assert_compare_db_item_with_dict(db_item, update_data, skip_keys_check=True)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     ("update_data", "expected_updated_flag", "set_none", "allowed_none_fields", "none_set_fields"),
     [
@@ -347,18 +358,18 @@ def test_change_item(
         ),
     ],
 )
-def test_change_item_none_check(
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+async def test_change_item_none_check(
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
     update_data: dict[str, Any],
     expected_updated_flag: bool,  # noqa: FBT001
     set_none: bool,  # noqa: FBT001
     allowed_none_fields: Any,  # noqa: FBT001, ANN401
     none_set_fields: set[str],
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    updated, db_item = query_obj.change_item(
+    item = await mymodel_async_factory(db_async_session)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    updated, db_item = await query_obj.change_item(
         data=update_data,
         item=item,
         set_none=set_none,
@@ -369,53 +380,56 @@ def test_change_item_none_check(
     assert_compare_db_item_none_fields(db_item, none_set_fields)
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize("use_flush", [True, False])
-def test_db_delete_direct_value(
+async def test_db_delete_direct_value(
     use_flush: bool,  # noqa: FBT001
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    delete_count = query_obj.db_delete(
+    item = await mymodel_async_factory(db_async_session)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    delete_count = await query_obj.db_delete(
         model=MyModel,
         filters={"id": item.id},
         use_flush=use_flush,
     )
     assert delete_count == 1
-    assert db_sync_session.scalar(select(func.count()).select_from(MyModel)) == 0
+    assert await db_async_session.scalar(select(func.count()).select_from(MyModel)) == 0
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize("use_flush", [True, False])
-def test_db_delete_multiple_values(
+async def test_db_delete_multiple_values(
     use_flush: bool,  # noqa: FBT001
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     to_delete_count = 3
     for _ in range(to_delete_count):
-        mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    delete_count = query_obj.db_delete(
+        await mymodel_async_factory(db_async_session)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    delete_count = await query_obj.db_delete(
         model=MyModel,
         use_flush=use_flush,
     )
     assert delete_count == to_delete_count
-    assert db_sync_session.scalar(select(func.count()).select_from(MyModel)) == 0
+    assert await db_async_session.scalar(select(func.count()).select_from(MyModel)) == 0
 
 
+@pytest.mark.asyncio()
 @pytest.mark.parametrize(
     "use_flush",
     [True, False],
 )
-def test_disable_items_direct_value(
+async def test_disable_items_direct_value(
     use_flush: bool,  # noqa: FBT001
-    db_sync_session: "Session",
-    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
-    item = mymodel_sync_factory(db_sync_session, bl=False)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
-    disable_count = query_obj.disable_items(
+    item = await mymodel_async_factory(db_async_session, bl=False)
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    disable_count = await query_obj.disable_items(
         model=MyModel,
         ids_to_disable={item.id},
         id_field=MyModel.id,
@@ -427,7 +441,7 @@ def test_disable_items_direct_value(
     )
     assert disable_count == 1
     assert (
-        db_sync_session.scalar(
+        await db_async_session.scalar(
             select(func.count()).select_from(MyModel).where(MyModel.bl.is_(False)),
         )
         == 0

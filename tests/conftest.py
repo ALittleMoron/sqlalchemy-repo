@@ -1,12 +1,12 @@
 import asyncio
 import os
-from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 
 import pytest
+import pytest_asyncio
 from mimesis import Datetime, Locale, Text
 from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import async_scoped_session, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from tests.utils import (
@@ -21,8 +21,10 @@ from tests.utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
     from sqlalchemy import Engine
-    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
     from sqlalchemy.orm import Session
 
     from tests.types import AsyncFactoryFunctionProtocol, SyncFactoryFunctionProtocol
@@ -90,21 +92,39 @@ def db_async_url(db_domain: str) -> str:
     return f"postgresql+asyncpg://{db_domain}"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
+def postgresql_url_with_template_db(db_domain_with_template_db: str) -> str:
+    """URL for test db (will be created in db_engine): async driver."""
+    return f"postgresql://{db_domain_with_template_db}"
+
+
+@pytest.fixture(scope="session")
 def db_sync_engine(db_sync_url: str) -> "Generator[Engine, None, None]":
     """SQLAlchemy engine session-based fixture."""
-    with suppress(SQLAlchemyError):
-        create_db(db_sync_url)
+    create_db(db_sync_url)
     engine = create_engine(db_sync_url, echo=False, pool_pre_ping=True)
     try:
         yield engine
     finally:
         engine.dispose()
-    with suppress(SQLAlchemyError):
-        destroy_db(db_sync_url)
+    destroy_db(db_sync_url)
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="session")  # type: ignore
+async def db_async_engine(
+    db_async_url: str,
+    db_name: str,
+    db_sync_engine: "Engine",
+) -> "AsyncGenerator[AsyncEngine, None]":  # type: ignore
+    """SQLAlchemy engine session-based fixture."""
+    engine = create_async_engine(db_async_url, echo=True, pool_pre_ping=True)
+    try:
+        yield engine
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session")
 def db_sync_session_factory(db_sync_engine: "Engine") -> "scoped_session[Session]":
     """SQLAlchemy session factory session-based fixture."""
     return scoped_session(
@@ -113,6 +133,21 @@ def db_sync_session_factory(db_sync_engine: "Engine") -> "scoped_session[Session
             autoflush=False,
             expire_on_commit=False,
         ),
+    )
+
+
+@pytest.fixture(scope="session")  # type: ignore
+def db_async_session_factory(
+    db_async_engine: "AsyncEngine",
+) -> "async_scoped_session[AsyncSession]":
+    """SQLAlchemy session factory session-based fixture."""
+    return async_scoped_session(
+        async_sessionmaker(
+            bind=db_async_engine,
+            autoflush=False,
+            expire_on_commit=False,
+        ),
+        asyncio.current_task,
     )
 
 
@@ -126,6 +161,19 @@ def db_sync_session(
     with db_sync_session_factory() as session:
         yield session
     Base.metadata.drop_all(db_sync_engine)
+
+
+@pytest_asyncio.fixture()  # type: ignore
+async def db_async_session(
+    db_async_engine: "AsyncEngine",
+    db_async_session_factory: "async_scoped_session[AsyncSession]",
+) -> "AsyncGenerator[AsyncSession, None]":
+    """SQLAlchemy session fixture."""
+    async with db_async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+    async with db_async_session_factory() as session:
+        yield session
 
 
 @pytest.fixture()
