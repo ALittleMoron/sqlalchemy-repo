@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar,
 from dev_utils.core.utils import get_utc_now
 from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
 from dev_utils.sqlalchemy.utils import apply_joins, apply_loads, get_sqlalchemy_attribute
-from sqlalchemy import CursorResult, and_, delete
+from sqlalchemy import CursorResult, and_, delete, func, insert, or_, select, text, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy import func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
 from sqlrepo.exc import QueryError
@@ -55,6 +54,7 @@ if TYPE_CHECKING:
     ColumnParam = str | QueryableAttribute[Any]
     OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
     DataDict = dict[str, Any]
+    StrField = str
 
 
 class BaseQuery:
@@ -66,7 +66,7 @@ class BaseQuery:
     def __init__(
         self,
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "ColumnElement[Any]"] | None = None,
+        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
         load_strategy: Callable[..., "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
@@ -350,7 +350,7 @@ class BaseSyncQuery(BaseQuery):
         self,
         session: "Session",
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "ColumnElement[Any]"] | None = None,
+        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
         load_strategy: Callable[[Any], "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
@@ -615,8 +615,8 @@ class BaseSyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
-        id_field: "InstrumentedAttribute[Any]",
-        disable_field: "InstrumentedAttribute[Any]",
+        id_field: "StrField",
+        disable_field: "StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
         extra_filters: "Filter | None" = None,
@@ -626,8 +626,8 @@ class BaseSyncQuery(BaseQuery):
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
-            id_field=id_field,
-            disable_field=disable_field,
+            id_field=get_sqlalchemy_attribute(model, id_field, only_columns=True),
+            disable_field=get_sqlalchemy_attribute(model, disable_field, only_columns=True),
             field_type=field_type,
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,
@@ -651,7 +651,7 @@ class BaseAsyncQuery(BaseQuery):
         self,
         session: "AsyncSession",
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "ColumnElement[Any]"] | None = None,
+        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
         load_strategy: Callable[..., "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
@@ -916,8 +916,8 @@ class BaseAsyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
-        id_field: "InstrumentedAttribute[Any]",
-        disable_field: "InstrumentedAttribute[Any]",
+        id_field: "StrField",
+        disable_field: "StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
         extra_filters: "Filter | None" = None,
@@ -927,8 +927,8 @@ class BaseAsyncQuery(BaseQuery):
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
-            id_field=id_field,
-            disable_field=disable_field,
+            id_field=get_sqlalchemy_attribute(model, id_field, only_columns=True),
+            disable_field=get_sqlalchemy_attribute(model, disable_field, only_columns=True),
             field_type=field_type,
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,

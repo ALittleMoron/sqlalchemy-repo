@@ -1,6 +1,7 @@
 import datetime
 import random
-from typing import TYPE_CHECKING, Any, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from sqlalchemy import ForeignKey, inspect
 from sqlalchemy.exc import SQLAlchemyError
@@ -74,6 +75,7 @@ def assert_compare_db_item_list(
     for item1, item2 in zip(
         sorted(items1, key=lambda x: x.id),  # type: ignore
         sorted(items2, key=lambda x: x.id),  # type: ignore
+        strict=True,
     ):
         assert_compare_db_items(item1, item2)
 

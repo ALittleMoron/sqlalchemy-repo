@@ -13,6 +13,7 @@ from typing import (
     Generic,
     Literal,
     NotRequired,
+    TypeAlias,
     TypedDict,
     TypeVar,
     get_args,
@@ -64,8 +65,9 @@ if TYPE_CHECKING:
     DataDict = dict[str, Any]
 
 
-StrField = str
+StrField: TypeAlias = str
 BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
+IsUpdated: TypeAlias = bool
 
 
 class RepositoryModelClassIncorrectUseWarning(Warning):
@@ -107,7 +109,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     """
 
     # TODO: add specific_column_mapping to filters, joins and loads.
-    specific_column_mapping: ClassVar["dict[str, ColumnElement[Any]]"] = {}
+    specific_column_mapping: ClassVar["dict[str, InstrumentedAttribute[Any]]"] = {}
     """
     Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.
 
@@ -168,7 +170,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     implementation of disable_field. If None and ``disable`` method was evaluated, there will be
     RepositoryAttributeError exception raised by Repository class.
     """
-    disable_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    disable_field: ClassVar["StrField | None"] = None
     """
     Uses as choice of used defined disable field.
 
@@ -176,7 +178,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     implementation of disable_field. If None and ``disable`` method was evaluated, there will be
     RepositoryAttributeError exception raised by Repository class.
     """
-    disable_id_field: ClassVar["InstrumentedAttribute[Any] | None"] = None
+    disable_id_field: ClassVar["StrField | None"] = None
     """
     Uses as choice of used defined id field in model, which supports disable.
 
@@ -329,6 +331,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             self.get_filter_convert_class(),
             self.specific_column_mapping,
             self.load_strategy,
+            logger,
         )
 
     async def get(
@@ -434,7 +437,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         *,
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[bool, BaseSQLAlchemyModel]":
+    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
         """Update model_class instance from given data.
 
         Returns tuple with boolean (was instance updated or not) and updated instance.
@@ -495,6 +498,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def __init__(
         self,
         session: "Session",
+        logger: "Logger" = default_logger,
     ) -> None:
         self.session = session
         self.queries = self.query_class(
@@ -502,6 +506,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             self.get_filter_convert_class(),
             self.specific_column_mapping,
             self.load_strategy,
+            logger,
         )
 
     def get(
@@ -523,8 +528,8 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def count(
         self,
         *,
-        joins: "Sequence[Join] | None" = None,
         filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
     ) -> int:
         """Get count of instances of model_class by given filters."""
         result = self.queries.get_items_count(
@@ -607,7 +612,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         *,
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[bool, BaseSQLAlchemyModel]":
+    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
         """Update model_class instance from given data.
 
         Returns tuple with boolean (was instance updated or not) and updated instance.
@@ -641,6 +646,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         extra_filters: "Filter | None" = None,
     ) -> "Count":
         """Disable model_class instances with given ids and extra_filters."""
+        self._validate_disable_attributes()
         result = self.queries.disable_items(
             model=self.model_class,
             ids_to_disable=ids_to_disable,

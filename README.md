@@ -4,6 +4,26 @@
 
 >SQLAlchemy repository pattern.
 
+## Current state
+
+Now, some features of repository pattern works incorrect or some parts of it is hard to understand
+or use. I want to simplify work with repositories, so this is TODO for my project:
+
+* [ ] Add more test cases for main functionality. Now, tested only base cases of repository
+    method use.
+* [ ] Add wrapper for all non sqlrepo exceptions. Now, some functionality could raise
+      "raw" SQLAlchemy error. I want to avoid the situation, when developer make
+      try-except with all possible exceptions, when works with my package.
+* [ ] Add more use-cases of `specific_column_mapping` option. Now it only works with
+      `search_by` and `order_by` params. I want to add it for filters, joins and other
+      parts, where it can be used.
+* [ ] Integrate sqlrepo with FastAPI or some other web-frameworks.
+* [ ] Add pydantic-like configuration. Current implementation works on ClassVar. I want to separate
+      configuration and main repository code.
+
+If all these todo items are finished, it means, that all, what I want, is implemented.
+If you want to give me advice or feedback, you are welcome.
+
 ## Install
 
 sqlrepo project doesn't has optional dependencies, so you can install it just as regular:
@@ -164,6 +184,9 @@ By default, None. Needs to be set manually, because this option depends on user 
 implementation of disable_field. If None and `disable` method was evaluated, there will be
 RepositoryAttributeError exception raised by Repository class.
 
+Now only works with string fields, because otherwise sqlalchemy think that Repository class is
+sqlalchemy model without mapping, and raise error.
+
 ### `disable_id_field`
 
 Uses as choice of used defined id field in model, which supports disable.
@@ -171,6 +194,9 @@ Uses as choice of used defined id field in model, which supports disable.
 By default, None. Needs to be set manually, because this option depends on user custom
 implementation of disable_field. If None and `disable` method was evaluated, there will be
 RepositoryAttributeError exception raised by Repository class.
+
+Now only works with string fields, because otherwise sqlalchemy think that Repository class is
+sqlalchemy model without mapping, and raise error.
 
 ### `unique_list_items`
 
