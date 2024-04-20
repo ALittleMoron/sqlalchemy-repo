@@ -46,7 +46,7 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
         exc: BaseException | None,
         traceback: types.TracebackType | None,
     ) -> None:
-        if exc:
+        if exc:  # pragma: no coverage
             logger.error("UNIT-OF-WORK E0: %s", exc)
             await self.rollback()
         else:
@@ -105,7 +105,7 @@ class BaseSyncUnitOfWork(ABC, Abstract):
         exc: BaseException | None,
         traceback: types.TracebackType | None,
     ) -> None:
-        if exc:
+        if exc:  # pragma: no coverage
             logger.error("UNIT-OF-WORK E0: %s", exc)
             self.rollback()
         else:

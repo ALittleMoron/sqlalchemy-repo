@@ -1,3 +1,5 @@
+import contextlib
+
 import pytest
 from sqlalchemy.orm import Session, scoped_session
 
@@ -33,3 +35,15 @@ def test_incorrect_uow_usage(db_sync_session_factory: scoped_session[Session]) -
         instance.rollback()
     with pytest.raises(NonContextManagerUOWUsageError):
         instance.close()
+
+
+def test_raise_in_context_manager(db_sync_session_factory: scoped_session[Session]) -> None:
+    class CorrectUOW(BaseSyncUnitOfWork):
+        session_factory = db_sync_session_factory  # type: ignore
+
+        def init_repositories(self, session: Session) -> None:
+            pass
+
+    with contextlib.suppress(Exception), CorrectUOW():
+        msg = "some error."
+        raise TypeError(msg)

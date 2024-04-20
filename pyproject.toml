@@ -112,8 +112,8 @@ omit = ['']
 [tool.coverage.report]
 exclude_lines = [
     "enum.Enum",
-    "# noqa",
     "# pragma: no cover",
+    "# pragma: no coverage",
     "raise NotImplementedError",
     "if TYPE_CHECKING:",
     "if typing.TYPE_CHECKING:",
@@ -159,7 +159,7 @@ dev = [
 
 [project]
 name = "sqlrepo"
-version = "1.3.0"
+version = "1.4.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"

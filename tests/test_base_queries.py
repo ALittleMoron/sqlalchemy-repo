@@ -9,6 +9,7 @@ from freezegun import freeze_time
 from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload, selectinload
 
+from sqlrepo.exc import QueryError
 from sqlrepo.queries import BaseQuery
 from tests.utils import MyModel, OtherModel
 
@@ -592,7 +593,7 @@ def test_disable_items_stmt(  # noqa
 
 def test_disable_items_stmt_type_error():  # noqa
     query = BaseQuery(SimpleFilterConverter)
-    with pytest.raises(TypeError):
+    with pytest.raises(QueryError):
         query._disable_items_stmt(  # type: ignore
             model=MyModel,
             ids_to_disable={1, 2, 3},
@@ -607,7 +608,7 @@ def test_disable_items_stmt_type_error():  # noqa
 def test_disable_items_stmt_value_error():  # noqa
     query = BaseQuery(SimpleFilterConverter)
     with pytest.raises(
-        ValueError,
+        QueryError,
         match='Parameter "ids_to_disable" should contains at least one element.',
     ):
         query._disable_items_stmt(  # type: ignore

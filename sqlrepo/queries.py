@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar,
 from dev_utils.core.utils import get_utc_now
 from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
 from dev_utils.sqlalchemy.utils import apply_joins, apply_loads, get_sqlalchemy_attribute
-from sqlalchemy import CursorResult, and_, delete, func, insert, or_, select, text, update
+from sqlalchemy import CursorResult, and_, delete
 from sqlalchemy import exc as sqlalchemy_exc
+from sqlalchemy import func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
 from sqlrepo.exc import QueryError
@@ -325,11 +326,11 @@ class BaseQuery:
                 f"{field_type} was passed."
             )
             self.logger.error(msg)
-            raise TypeError(msg)
+            raise QueryError(msg)
         if len(ids_to_disable) == 0:
             msg = 'Parameter "ids_to_disable" should contains at least one element.'
             self.logger.error(msg)
-            raise ValueError(msg)
+            raise QueryError(msg)
         filters = self._make_disable_filters(
             model=model,
             ids_to_disable=ids_to_disable,

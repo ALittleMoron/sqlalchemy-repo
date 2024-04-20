@@ -21,9 +21,10 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
       NOTE: in future sqlrepo will be replaced with something like python-repository-pattern.
 * [ ] Add more test cases for main functionality. Now, tested only base cases of repository
     method use.
-* [ ] Add wrapper for all non sqlrepo exceptions. Now, some functionality could raise
+* [x] Add wrapper for all non sqlrepo exceptions. Now, some functionality could raise
       "raw" SQLAlchemy error. I want to avoid the situation, when developer make
       try-except with all possible exceptions, when works with my package.
+      NOTE: added since 1.4.0
 * [ ] Add more use-cases of `specific_column_mapping` option. Now it only works with
       `search_by` and `order_by` params. I want to add it for filters, joins and other
       parts, where it can be used.
