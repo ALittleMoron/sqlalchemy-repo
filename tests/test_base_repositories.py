@@ -38,6 +38,13 @@ def test_cant_eval_forward_ref() -> None:
             ...
 
 
+def test_eval_forward_ref() -> None:
+    class MyRepo(BaseRepository["MyModel"]):  # type: ignore
+        ...
+
+    assert MyRepo.model_class == MyModel  # type: ignore
+
+
 def test_generic_incorrect_type() -> None:
     with pytest.warns(
         RepositoryModelClassIncorrectUseWarning,
@@ -66,8 +73,8 @@ def test_correct_use() -> None:
 
 def test_validate_disable_attributes() -> None:
     class CorrectRepo(BaseRepository[MyModel]):
-        disable_id_field = MyModel.id
-        disable_field = MyModel.bl
+        disable_id_field = "id"
+        disable_field = "bl"
         disable_field_type = bool
 
     CorrectRepo._validate_disable_attributes()  # type: ignore

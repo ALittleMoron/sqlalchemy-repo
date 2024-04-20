@@ -2,13 +2,23 @@
 
 ![coverage](./coverage.svg)
 
->SQLAlchemy repository pattern.
+> Repository pattern implementation for SQLAlchemy models.
+
+## About repository pattern
+
+Actually, I know, that my implementation is not good as repository pattern. I know, that
+repository must has abstract interface, which must be implemented for different backends. I have
+plans to make sqlrepo part of repository-pattern package, which will implements all possible
+backends.
 
 ## Current state
 
 Now, some features of repository pattern works incorrect or some parts of it is hard to understand
 or use. I want to simplify work with repositories, so this is TODO for my project:
 
+* [ ] Add more backends for repository pattern. Now, only SQLAlchemy adapter implemented. I want
+      to implement other backends to make this repository better to use in different situations.
+      NOTE: in future sqlrepo will be replaced with something like python-repository-pattern.
 * [ ] Add more test cases for main functionality. Now, tested only base cases of repository
     method use.
 * [ ] Add wrapper for all non sqlrepo exceptions. Now, some functionality could raise

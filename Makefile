@@ -56,7 +56,7 @@ format:
 .PHONY: test
 test:
 	@if [ -z $(PDM) ]; then echo "Poetry could not be found. See https://python-poetry.org/docs/"; exit 2; fi
-	$(PDM) run pytest ./tests --cov-report xml --cov-fail-under 60 --cov ./$(NAME) -vv
+	$(PDM) run pytest ./tests --cov-report xml --cov-fail-under 95 --cov ./$(NAME) -vv
 
 
 .PHONY: test_docker

@@ -5,18 +5,26 @@ from abc import ABC, abstractmethod
 from typing import Self
 
 from dev_utils.core.abstract import Abstract, abstract_class_property
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_scoped_session, async_sessionmaker
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
+from sqlrepo.exc import NonContextManagerUOWUsageError
 from sqlrepo.logging import logger
+
+_uow_non_context_manager_usage_msg = (
+    "Unit of work only provide context manager access. "
+    "Don't initialize your Unit of work class directly."
+)
 
 
 class BaseAsyncUnitOfWork(ABC, Abstract):
     """Base async unit of work pattern."""
 
     __skip_session_use__: bool = False
-    session_factory: "async_sessionmaker[AsyncSession]" = abstract_class_property(
-        async_sessionmaker[AsyncSession],
+    session_factory: "async_sessionmaker[AsyncSession] | async_scoped_session[AsyncSession]" = (
+        abstract_class_property(
+            async_sessionmaker[AsyncSession],
+        )
     )
 
     @abstractmethod
@@ -47,28 +55,34 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 
     async def commit(self) -> None:
         """Alias for session ``commit``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        await self.session.commit()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        await self.session.commit()  # pragma: no coverage
 
     async def rollback(self) -> None:
         """Alias for session ``rollback``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        await self.session.rollback()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        await self.session.rollback()  # pragma: no coverage
 
     async def close(self) -> None:
         """Alias for session ``close``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        await self.session.close()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        await self.session.close()  # pragma: no coverage
 
 
 class BaseSyncUnitOfWork(ABC, Abstract):
     """Base sync unit of work pattern."""
 
     __skip_session_use__: bool = False
-    session_factory: "sessionmaker[Session]" = abstract_class_property(
+    session_factory: "sessionmaker[Session] | scoped_session[Session]" = abstract_class_property(
         sessionmaker[Session],
     )
 
@@ -100,18 +114,24 @@ class BaseSyncUnitOfWork(ABC, Abstract):
 
     def commit(self) -> None:
         """Alias for session ``commit``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        self.session.commit()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        self.session.commit()  # pragma: no coverage
 
     def rollback(self) -> None:
         """Alias for session ``rollback``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        self.session.rollback()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        self.session.rollback()  # pragma: no coverage
 
     def close(self) -> None:
         """Alias for session ``close``."""
-        if not self.session or self.__skip_session_use__:
+        if self.__skip_session_use__:
             return
-        self.session.close()
+        if not hasattr(self, 'session'):
+            raise NonContextManagerUOWUsageError(_uow_non_context_manager_usage_msg)
+        self.session.close()  # pragma: no coverage

@@ -36,7 +36,7 @@ now = datetime.datetime.now(tz=ZoneInfo("UTC"))
     ],
 )
 def test_resolve_specific_columns(  # noqa
-    specific_column_mapping: dict[str, ColumnElement[Any]],
+    specific_column_mapping: Any,  # noqa: ANN401
     elements: list[str | ColumnElement[Any]],
     expected_result: list[str | ColumnElement[Any]],  # noqa
 ) -> None:
