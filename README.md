@@ -302,3 +302,107 @@ class YourUnitOfWork(BaseAsyncUnitOfWork):
 
 and this will cause no commit or other session manipulation (except session create for repositories
 work).
+
+## Extensions
+
+v1.5.0 now provided extensions for other technologies like web-frameworks. Now only FastAPI is
+supported.
+
+### FastAPI
+
+FastAPI extensions implements base classes for services and container, so you can work with your
+code easier.
+
+First of all You need to prepare all to work with plugin:
+
+```python
+from functools import cached_property
+
+from fastapi import FastAPI
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+from sqlrepo import BaseSyncRepository
+
+engine = create_engine("<your-db-url-here>")
+Session = sessionmaker(engine)
+
+
+class Base(DeclarativeBase): ...
+
+
+class YourModel(Base):
+    # Your model definition
+    ...
+
+
+def get_session():
+    with Session() as session:
+        yield session
+
+
+app = FastAPI()
+```
+
+then you should use plugin like this:
+
+```python
+# your prepared code below
+
+from sqlrepo.ext.fastapi import add_container_overrides
+add_container_overrides(app, get_session)
+```
+
+then you can implements containers and services like this:
+
+```python
+# your prepared code below
+
+from pydantic import BaseModel, ConfigDict
+
+from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService
+
+
+class YourModelDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    ...
+
+
+class YourModelList(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    ...
+
+
+class YourModelRepository(BaseSyncRepository[YourModel]):
+    def your_custom_repo_method(self) -> YourModel: ...
+
+
+class YourModelService(BaseSyncService[YourModel, YourModelDetail, YourModelList]):
+    detail_schema = YourModelDetail
+    list_schema = YourModelList
+    not_found_message = "YourModel entity not found in database"
+    not_found_exception = HTTPException
+
+    def init_repositories(self, session: "Session") -> None:
+        self.your_model_repo = YourModelRepository(session)
+
+    def your_custom_service_method(self) -> YourModelDetail:
+        return self.resolve(self.your_model_repo.your_custom_repo_method())
+
+
+class Container(BaseSyncContainer):
+
+    @cached_property
+    def your_model_service(self):
+        return YourModelService(self.session, self.request)
+```
+
+and finally you can use Container in your routes like this:
+
+```python
+# your prepared code below
+
+@app.get("/", response_model=YourModelDetail)
+def get_your_model(container: Container = Depends()):
+    return container.your_model_service.your_custom_service_method()
+```

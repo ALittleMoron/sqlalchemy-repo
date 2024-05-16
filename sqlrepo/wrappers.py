@@ -20,13 +20,16 @@ def wrap_any_exception_manager() -> "Generator[None, None, Any]":
 
         2) if there is error from python-dev-utils (BaseDevError), throw RepositoryError.
 
-        3) if there is possible python errors (no all. Only specific), throw BaseSQLRepoError.
+        3) if there is possible python errors (not all. Only specific), throw BaseSQLRepoError.
     """
     try:
         yield
     except SQLAlchemyError as exc:
-        raise QueryError from exc
+        msg = "error on SQLAlchemy level."
+        raise QueryError(msg) from exc
     except BaseDevError as exc:
+        msg = "error on python-dev-utils package level."
         raise RepositoryError from exc
     except (AttributeError, TypeError, ValueError) as exc:
+        msg = "error on python level."
         raise BaseSQLRepoError from exc
