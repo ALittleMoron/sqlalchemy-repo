@@ -42,9 +42,9 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 
     async def __aexit__(  # noqa: D105
         self,
-        exc_type: type[BaseException] | None,
+        exc_type: type[BaseException] | None,  # noqa
         exc: BaseException | None,
-        traceback: types.TracebackType | None,
+        traceback: types.TracebackType | None,  # noqa
     ) -> None:
         if exc:  # pragma: no coverage
             logger.error("UNIT-OF-WORK E0: %s", exc)
@@ -101,9 +101,9 @@ class BaseSyncUnitOfWork(ABC, Abstract):
 
     def __exit__(  # noqa: D105
         self,
-        exc_type: type[BaseException] | None,
+        exc_type: type[BaseException] | None,  # noqa
         exc: BaseException | None,
-        traceback: types.TracebackType | None,
+        traceback: types.TracebackType | None,  # noqa
     ) -> None:
         if exc:  # pragma: no coverage
             logger.error("UNIT-OF-WORK E0: %s", exc)
