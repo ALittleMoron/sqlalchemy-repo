@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Protocol
 from fastapi import Depends, Request
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
     from fastapi import FastAPI
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.session import Session
@@ -11,13 +13,13 @@ if TYPE_CHECKING:
         """Sync session depends protocol for FastAPI framework."""
 
         @staticmethod
-        def __call__() -> Session: ...  # noqa: D102
+        def __call__() -> Session | Generator[Session, None, None]: ...  # noqa: D102
 
     class AsyncSessionDependsProtocol(Protocol):
         """Async session depends protocol for FastAPI framework."""
 
         @staticmethod
-        async def __call__() -> AsyncSession: ...  # noqa: D102
+        async def __call__() -> AsyncSession | AsyncGenerator[AsyncSession, None]: ...  # noqa: D102
 
 
 def _get_session_stub() -> None:
