@@ -159,7 +159,7 @@ dev = [
 
 [project]
 name = "sqlrepo"
-version = "1.5.2"
+version = "2.0.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"
@@ -167,7 +167,7 @@ readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
     "sqlalchemy>=2.0.29",
-    "python-dev-utils[sqlalchemy_filters]>=1.11.0",
+    "python-dev-utils[sqlalchemy_filters]>=2.2.0",
 ]
 
 [project.optional-dependencies]

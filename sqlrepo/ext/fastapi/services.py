@@ -9,6 +9,7 @@ from pydantic import BaseModel, TypeAdapter
 from sqlalchemy.orm.decl_api import DeclarativeBase
 
 from sqlrepo.ext.fastapi.helpers import NotSet, NotSetType
+from sqlrepo.ext.fastapi.pagination import PaginatedResult, PaginationMeta
 from sqlrepo.logging import logger
 
 if TYPE_CHECKING:
@@ -153,6 +154,17 @@ class BaseService(Generic[TModel, TDetailSchema, VListSchema]):
             msg = "list_schema must be set, if you use resolve_entity in your code."
             raise AttributeError(msg)  # noqa: TRY004
         return TypeAdapter(list[self.list_schema]).validate_python(entities, from_attributes=True)
+
+    def paginate_result(
+        self,
+        entities: "Sequence[TModel]",
+        meta: PaginationMeta,
+    ) -> PaginatedResult["VListSchema"]:
+        """Resolve list if entities and put them into pagination."""
+        return PaginatedResult(
+            meta=meta,
+            data=self.resolve_entity_list(entities=entities),
+        )
 
 
 class BaseAsyncService(BaseService[TModel, TDetailSchema, VListSchema]):

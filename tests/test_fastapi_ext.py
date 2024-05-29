@@ -12,9 +12,16 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter
 from sqlalchemy.orm.session import Session
 
 from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService, add_container_overrides
+from sqlrepo.ext.fastapi.pagination import (
+    AbstractBasePagination,
+    LimitOffsetPagination,
+    PageSizePagination,
+    PaginatedResult,
+    PaginationMeta,
+)
 from sqlrepo.ext.fastapi.services import NotSet, ServiceClassIncorrectUseWarning
 from sqlrepo.repositories import BaseSyncRepository
-from tests.utils import MyModel
+from tests.utils import MyModel, assert_compare_db_item_with_dict
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -70,6 +77,18 @@ class MyModelService(BaseSyncService[MyModel, MyModelDetail, MyModelList]):  # n
     def list(self) -> list[MyModelList]:  # noqa: D102
         entities = self.my_model_repo.list()
         return self.resolve_entity_list(entities)
+
+    def list_paginated(  # noqa: D102
+        self,
+        pagination: AbstractBasePagination,
+    ) -> PaginatedResult[MyModelList]:
+        entities = self.my_model_repo.list(limit=pagination.limit, offset=pagination.offset)
+        total_count = self.my_model_repo.count()
+        meta = PaginationMeta.create(
+            all_records_count=total_count,
+            pagination=pagination,
+        )
+        return self.paginate_result(entities, meta)
 
 
 class InvalidService(MyModelService):  # noqa: D101
@@ -159,6 +178,20 @@ def app_with_sync_container(get_sync_session_depends: "Callable[..., Session]") 
     def get_all(container: Container = Depends()):  # type: ignore # noqa: ANN202
         return container.my_model_service.list()
 
+    @app.get('/get-limit-offset-paginated/')
+    def get_paginated_limit_offset(  # type: ignore # noqa: ANN202
+        pagination: LimitOffsetPagination = Depends(),
+        container: Container = Depends(),
+    ):
+        return container.my_model_service.list_paginated(pagination)
+
+    @app.get('/get-page-size-paginated/')
+    def get_paginated_page_size(  # type: ignore # noqa: ANN202
+        pagination: PageSizePagination = Depends(),
+        container: Container = Depends(),
+    ):
+        return container.my_model_service.list_paginated(pagination)
+
     @app.get('/get-all-invalid/')
     def get_all_invalid(container: Container = Depends()):  # type: ignore # noqa: ANN202
         return container.invalid_service.list()
@@ -220,6 +253,58 @@ def test_get_one_python_not_found(
 ) -> None:
     with pytest.raises(ValueError, match="MyModel entity not found."):
         app_with_sync_container.get('/get-one-python/1251251')
+
+
+def test_limit_offset_pagination(
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+    app_with_sync_container: "TestClient",
+) -> None:
+
+    items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
+    items_map = {item.id: item for item in items}
+    db_sync_session.commit()
+    response = app_with_sync_container.get('/get-limit-offset-paginated/?limit=1')
+    assert response.status_code == status.HTTP_200_OK
+    response = response.json()
+    schema = TypeAdapter(PaginatedResult[MyModelList]).validate_python(response)
+    assert schema.meta.all_pages_count == len(items)
+    assert schema.meta.filtered_pages_count == len(items)
+    assert schema.meta.all_records_count == len(items)
+    assert schema.meta.filtered_records_count == len(items)
+    assert schema.meta.per_page == 1
+    assert schema.meta.current_page == 1
+    assert schema.meta.prev_page is None
+    assert schema.meta.next_page == 2  # noqa: PLR2004
+    for item in schema.data:
+        assert item.id in items_map
+        assert_compare_db_item_with_dict(items_map[item.id], item.model_dump())
+
+
+def test_page_size_pagination(
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+    app_with_sync_container: "TestClient",
+) -> None:
+
+    items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
+    items_map = {item.id: item for item in items}
+    db_sync_session.commit()
+    response = app_with_sync_container.get('/get-page-size-paginated/?per_page=1')
+    assert response.status_code == status.HTTP_200_OK
+    response = response.json()
+    schema = TypeAdapter(PaginatedResult[MyModelList]).validate_python(response)
+    assert schema.meta.all_pages_count == len(items)
+    assert schema.meta.filtered_pages_count == len(items)
+    assert schema.meta.all_records_count == len(items)
+    assert schema.meta.filtered_records_count == len(items)
+    assert schema.meta.per_page == 1
+    assert schema.meta.current_page == 1
+    assert schema.meta.prev_page is None
+    assert schema.meta.next_page == 2  # noqa: PLR2004
+    for item in schema.data:
+        assert item.id in items_map
+        assert_compare_db_item_with_dict(items_map[item.id], item.model_dump())
 
 
 def test_get_all(
