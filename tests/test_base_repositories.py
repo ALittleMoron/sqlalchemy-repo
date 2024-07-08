@@ -7,6 +7,7 @@ from dev_utils.sqlalchemy.filters.converters import (
     SimpleFilterConverter,
 )
 
+from sqlrepo.config import RepositoryConfig
 from sqlrepo.exc import RepositoryAttributeError
 from sqlrepo.repositories import BaseRepository, RepositoryModelClassIncorrectUseWarning
 from tests.utils import MyModel
@@ -73,9 +74,11 @@ def test_correct_use() -> None:
 
 def test_validate_disable_attributes() -> None:
     class CorrectRepo(BaseRepository[MyModel]):
-        disable_id_field = "id"
-        disable_field = "bl"
-        disable_field_type = bool
+        config = RepositoryConfig(
+            disable_id_field="id",
+            disable_field="bl",
+            disable_field_type=bool,
+        )
 
     CorrectRepo._validate_disable_attributes()  # type: ignore
 
@@ -97,6 +100,6 @@ def test_validate_disable_attributes_raise_error() -> None:
 )
 def test_get_filter_convert_class(strategy: str, expected_class: Any) -> None:  # noqa: ANN401
     class CorrectRepo(BaseRepository[MyModel]):
-        filter_convert_strategy = strategy  # type: ignore
+        config = RepositoryConfig(filter_convert_strategy=strategy)  # type: ignore
 
-    assert CorrectRepo.get_filter_convert_class() == expected_class
+    assert CorrectRepo.config.get_filter_convert_class() == expected_class

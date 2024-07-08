@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar,
 from dev_utils.core.utils import get_utc_now
 from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
 from dev_utils.sqlalchemy.utils import apply_joins, apply_loads, get_sqlalchemy_attribute
-from sqlalchemy import CursorResult, and_, delete
+from sqlalchemy import CursorResult, and_, delete, func, insert, or_, select, text, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy import func, insert, or_, select, text, update
 from sqlalchemy.orm import joinedload
 
 from sqlrepo.exc import QueryError
@@ -604,10 +603,10 @@ class BaseSyncQuery(BaseQuery):
                 self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             self.session.rollback()
-            msg = f"Delete from database error: {exc}"  # noqa: S608
+            msg = f"Error delete db_item: {exc}"  # noqa: S608
             self.logger.warning(msg)
             return False
-        msg = f"Delete from database success. Item: {item_repr}"  # noqa: S608
+        msg = f"Success delete db_item. Item: {item_repr}"  # noqa: S608
         self.logger.debug(msg)
         return True
 
@@ -616,8 +615,8 @@ class BaseSyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
-        id_field: "StrField",
-        disable_field: "StrField",
+        id_field: "InstrumentedAttribute[Any] | StrField",
+        disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
         extra_filters: "Filter | None" = None,
@@ -627,8 +626,16 @@ class BaseSyncQuery(BaseQuery):
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
-            id_field=get_sqlalchemy_attribute(model, id_field, only_columns=True),
-            disable_field=get_sqlalchemy_attribute(model, disable_field, only_columns=True),
+            id_field=(
+                get_sqlalchemy_attribute(model, id_field, only_columns=True)
+                if isinstance(id_field, str)
+                else id_field
+            ),
+            disable_field=(
+                get_sqlalchemy_attribute(model, disable_field, only_columns=True)
+                if isinstance(disable_field, str)
+                else disable_field
+            ),
             field_type=field_type,
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,
@@ -905,10 +912,10 @@ class BaseAsyncQuery(BaseQuery):
                 await self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             await self.session.rollback()
-            msg = f"Delete from database error: {exc}"  # noqa: S608
+            msg = f"Error delete db_item: {exc}"  # noqa: S608
             self.logger.warning(msg)
             return False
-        msg = f"Delete from database success. Item: {item_repr}"  # noqa: S608
+        msg = f"Success delete db_item. Item: {item_repr}"  # noqa: S608
         self.logger.debug(msg)
         return True
 
@@ -917,8 +924,8 @@ class BaseAsyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
-        id_field: "StrField",
-        disable_field: "StrField",
+        id_field: "InstrumentedAttribute[Any] | StrField",
+        disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
         extra_filters: "Filter | None" = None,
@@ -928,8 +935,16 @@ class BaseAsyncQuery(BaseQuery):
         stmt = self._disable_items_stmt(
             model=model,
             ids_to_disable=ids_to_disable,
-            id_field=get_sqlalchemy_attribute(model, id_field, only_columns=True),
-            disable_field=get_sqlalchemy_attribute(model, disable_field, only_columns=True),
+            id_field=(
+                get_sqlalchemy_attribute(model, id_field, only_columns=True)
+                if isinstance(id_field, str)
+                else id_field
+            ),
+            disable_field=(
+                get_sqlalchemy_attribute(model, disable_field, only_columns=True)
+                if isinstance(disable_field, str)
+                else disable_field
+            ),
             field_type=field_type,
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,

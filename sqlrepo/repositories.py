@@ -1,17 +1,12 @@
 """Main implementations for sqlrepo project."""
 
-import datetime
 import importlib
 import warnings
-from collections.abc import Callable
 from typing import (
     TYPE_CHECKING,
     Any,
-    ClassVar,
-    Final,
     ForwardRef,
     Generic,
-    Literal,
     NotRequired,
     TypeAlias,
     TypedDict,
@@ -20,17 +15,10 @@ from typing import (
     overload,
 )
 
-from dev_utils.sqlalchemy.filters.converters import (
-    AdvancedOperatorFilterConverter,
-    BaseFilterConverter,
-    DjangoLikeFilterConverter,
-    SimpleFilterConverter,
-)
-from dev_utils.sqlalchemy.filters.types import FilterConverterStrategiesLiteral
 from sqlalchemy.orm import DeclarativeBase as Base
-from sqlalchemy.orm import selectinload
 
 from sqlrepo import exc as sqlrepo_exc
+from sqlrepo.config import RepositoryConfig
 from sqlrepo.logging import logger as default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
 from sqlrepo.wrappers import wrap_any_exception_manager
@@ -40,7 +28,7 @@ if TYPE_CHECKING:
     from logging import Logger
 
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
+    from sqlalchemy.orm.attributes import QueryableAttribute
     from sqlalchemy.orm.session import Session
     from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore
     from sqlalchemy.sql._typing import _ColumnExpressionOrStrLabelArgument  # type: ignore
@@ -109,140 +97,19 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
     ```
     """
 
-    # TODO: add specific_column_mapping to filters, joins and loads.
-    specific_column_mapping: ClassVar["dict[str, InstrumentedAttribute[Any]]"] = {}
-    """
-    Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.
+    config = RepositoryConfig()
+    """Repository config, that contains all settings.
 
-    Uses as mapping for some attributes, that you need to alias or need to specify column
-    from other models.
-
-    Warning: if you specify column from other model, it may cause errors. For example, update
-    doesn't use it for filters, because joins are not presents in update.
-    """
-    use_flush: ClassVar[bool] = True
-    """
-    Uses as flag of flush method in SQLAlchemy session.
-
-    By default, True, because repository has (mostly) multiple methods evaluate use. For example,
-    generally, you want to create some model instances, create some other (for example, log table)
-    and then receive other model instance in one use (for example, in Unit of work pattern).
-
-    If you will work with repositories as single methods uses, switch to use_flush=False. It will
-    make queries commit any changes.
-    """
-    update_set_none: ClassVar[bool] = False
-    """
-    Uses as flag of set None option in ``update_instance`` method.
-
-    If True, allow to force ``update_instance`` instance columns with None value. Works together
-    with ``update_allowed_none_fields``.
-
-    By default False, because it's not safe to set column to None - current version if sqlrepo
-    not able to check optional type. Will be added in next versions, and ``then update_set_none``
-    will be not necessary.
-    """
-    update_allowed_none_fields: ClassVar['Literal["*"] | set[StrField]'] = "*"
-    """
-    Set of strings, which represents columns of model.
-
-    Uses as include or exclude for given data in ``update_instance`` method.
-
-    By default allow any fields. Not dangerous, because ``update_set_none`` by default set to False,
-    and there will be no affect on ``update_instance`` method
-    """
-    allow_disable_filter_by_value: ClassVar[bool] = True
-    """
-    Uses as flag of filtering in disable method.
-
-    If True, make additional filter, which will exclude items, which already disabled.
-    Logic of disable depends on type of disable column. See ``disable_field`` docstring for more
-    information.
-
-    By default True, because it will make more efficient query to not override disable column. In
-    some cases (like datetime disable field) it may be better to turn off this flag to save disable
-    with new context (repeat disable, if your domain supports repeat disable and it make sense).
-    """
-    disable_field_type: ClassVar[type[datetime.datetime] | type[bool] | None] = None
-    """
-    Uses as choice of type of disable field.
-
-    By default, None. Needs to be set manually, because this option depends on user custom
-    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
-    RepositoryAttributeError exception raised by Repository class.
-    """
-    disable_field: ClassVar["StrField | None"] = None
-    """
-    Uses as choice of used defined disable field.
-
-    By default, None. Needs to be set manually, because this option depends on user custom
-    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
-    RepositoryAttributeError exception raised by Repository class.
-    """
-    disable_id_field: ClassVar["StrField | None"] = None
-    """
-    Uses as choice of used defined id field in model, which supports disable.
-
-    By default, None. Needs to be set manually, because this option depends on user custom
-    implementation of disable_field. If None and ``disable`` method was evaluated, there will be
-    RepositoryAttributeError exception raised by Repository class.
-    """
-    unique_list_items: ClassVar[bool] = True
-    """
-    Warning! Ambiguous option!
-    ==========================
-
-    Current version of ``sqlrepo`` works with load strategies with user configured option
-    ``load_strategy``. In order to make ``list`` method works stable, this option is used.
-    If you don't work with relationships in your model or you don't need unique (for example,
-    if you use selectinload), set this option to False. Otherwise keep it in True state.
-    """
-    filter_convert_strategy: ClassVar[FilterConverterStrategiesLiteral] = "simple"
-    """
-    Uses as choice of filter convert.
-
-    By default "simple", so you able to pass filters with ``key-value`` structure. You still can
-    pass raw filters (just list of SQLAlchemy filters), but if you pass dict, it will be converted
-    to SQLAlchemy filters with passed strategy.
-
-    Currently, supported converters:
-
-        ``simple`` - ``key-value`` dict.
-
-        ``advanced`` - dict with ``field``, ``value`` and ``operator`` keys.
-        List of operators:
-
-            ``=, >, <, >=, <=, is, is_not, between, contains``
-
-        ``django-like`` - ``key-value`` dict with django-like lookups system. See django docs for
-        more info.
-    """
-    load_strategy: ClassVar[Callable[..., "_AbstractLoad"]] = selectinload
-    """
-    Uses as choice of SQLAlchemy load strategies.
-
-    By default selectinload, because it makes less errors.
-    """
-
-    _filter_convert_classes: Final[
-        dict[FilterConverterStrategiesLiteral, type[BaseFilterConverter]]
-    ] = {
-        "simple": SimpleFilterConverter,
-        "advanced": AdvancedOperatorFilterConverter,
-        "django": DjangoLikeFilterConverter,
-    }
-    """
-    Final convert class filters mapping.
-
-    Don't override it, because it can makes unexpected errors.
+    To add your own settings, inherit RepositoryConfig and add your own fields, then init it in
+    your Repository class as class variable.
     """
 
     @classmethod
     def _validate_disable_attributes(cls) -> None:
         if (
-            cls.disable_id_field is None
-            or cls.disable_field is None
-            or cls.disable_field_type is None
+            cls.config.disable_id_field is None
+            or cls.config.disable_field is None
+            or cls.config.disable_field_type is None
         ):
             msg = (
                 'Attribute "disable_id_field" or "disable_field" or "disable_field_type" not '
@@ -304,11 +171,6 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             return
         cls.model_class = model  # type: ignore
 
-    @classmethod
-    def get_filter_convert_class(cls) -> type[BaseFilterConverter]:
-        """Get filter convert class from passed strategy."""
-        return cls._filter_convert_classes[cls.filter_convert_strategy]
-
 
 class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     """Base repository class with async interface.
@@ -329,9 +191,9 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self.logger = logger
         self.queries = self.query_class(
             session,
-            self.get_filter_convert_class(),
-            self.specific_column_mapping,
-            self.load_strategy,
+            self.config.get_filter_convert_class(),
+            self.config.specific_column_mapping,
+            self.config.default_load_strategy,
             logger,
         )
 
@@ -391,7 +253,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 order_by=order_by,
                 limit=limit,
                 offset=offset,
-                unique_items=self.unique_list_items,
+                unique_items=self.config.unique_list_items,
             )
         return result
 
@@ -434,7 +296,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 model=self.model_class,
                 data=data,
                 filters=filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -452,9 +314,9 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = await self.queries.change_item(
                 data=data,
                 item=instance,
-                set_none=self.update_set_none,
-                allowed_none_fields=self.update_allowed_none_fields,
-                use_flush=self.use_flush,
+                set_none=self.config.update_set_none,
+                allowed_none_fields=self.config.update_allowed_none_fields,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -468,7 +330,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = await self.queries.db_delete(
                 model=self.model_class,
                 filters=filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -484,12 +346,12 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = await self.queries.disable_items(
                 model=self.model_class,
                 ids_to_disable=ids_to_disable,
-                id_field=self.disable_id_field,  # type: ignore
-                disable_field=self.disable_field,  # type: ignore
-                field_type=self.disable_field_type,  # type: ignore
-                allow_filter_by_value=self.allow_disable_filter_by_value,
+                id_field=self.config.disable_id_field,  # type: ignore
+                disable_field=self.config.disable_field,  # type: ignore
+                field_type=self.config.disable_field_type,  # type: ignore
+                allow_filter_by_value=self.config.allow_disable_filter_by_value,
                 extra_filters=extra_filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -512,9 +374,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self.session = session
         self.queries = self.query_class(
             session,
-            self.get_filter_convert_class(),
-            self.specific_column_mapping,
-            self.load_strategy,
+            self.config.get_filter_convert_class(),
+            self.config.specific_column_mapping,
+            self.config.default_load_strategy,
             logger,
         )
 
@@ -574,7 +436,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 order_by=order_by,
                 limit=limit,
                 offset=offset,
-                unique_items=self.unique_list_items,
+                unique_items=self.config.unique_list_items,
             )
         return result
 
@@ -617,7 +479,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 model=self.model_class,
                 data=data,
                 filters=filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -635,9 +497,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = self.queries.change_item(
                 data=data,
                 item=instance,
-                set_none=self.update_set_none,
-                allowed_none_fields=self.update_allowed_none_fields,
-                use_flush=self.use_flush,
+                set_none=self.config.update_set_none,
+                allowed_none_fields=self.config.update_allowed_none_fields,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -651,7 +513,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = self.queries.db_delete(
                 model=self.model_class,
                 filters=filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result
 
@@ -667,11 +529,11 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             result = self.queries.disable_items(
                 model=self.model_class,
                 ids_to_disable=ids_to_disable,
-                id_field=self.disable_id_field,  # type: ignore
-                disable_field=self.disable_field,  # type: ignore
-                field_type=self.disable_field_type,  # type: ignore
-                allow_filter_by_value=self.allow_disable_filter_by_value,
+                id_field=self.config.disable_id_field,  # type: ignore
+                disable_field=self.config.disable_field,  # type: ignore
+                field_type=self.config.disable_field_type,  # type: ignore
+                allow_filter_by_value=self.config.allow_disable_filter_by_value,
                 extra_filters=extra_filters,
-                use_flush=self.use_flush,
+                use_flush=self.config.use_flush,
             )
         return result

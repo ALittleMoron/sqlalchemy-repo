@@ -4,6 +4,7 @@ import pytest
 from mimesis import Datetime, Locale, Text
 from sqlalchemy import func, select
 
+from sqlrepo.config import RepositoryConfig
 from sqlrepo.exc import RepositoryAttributeError
 from sqlrepo.repositories import BaseSyncRepository
 from tests.utils import (
@@ -31,10 +32,21 @@ class EmptyMyModelRepo(BaseSyncRepository[MyModel]):  # noqa: D101
 
 
 class MyModelRepo(BaseSyncRepository[MyModel]):  # noqa: D101
-    specific_column_mapping = {"some_specific_column": MyModel.name}
-    disable_id_field = "id"
-    disable_field = "bl"
-    disable_field_type = bool
+    config = RepositoryConfig(
+        specific_column_mapping={"some_specific_column": MyModel.name},
+        disable_id_field="id",
+        disable_field="bl",
+        disable_field_type=bool,
+    )
+
+
+class MyModelRepoWithInstrumentedAttributes(BaseSyncRepository[MyModel]):  # noqa: D101
+    config = RepositoryConfig(
+        specific_column_mapping={"some_specific_column": MyModel.name},
+        disable_id_field=MyModel.id,
+        disable_field=MyModel.bl,
+        disable_field_type=bool,
+    )
 
 
 def test_get_item(  # noqa: D103
@@ -278,8 +290,8 @@ def test_change_item_none_check(
 ) -> None:
     item = mymodel_sync_factory(db_sync_session)
     repo = MyModelRepo(db_sync_session)
-    repo.update_set_none = set_none  # type: ignore
-    repo.update_allowed_none_fields = allowed_none_fields  # type: ignore
+    repo.config.update_set_none = set_none  # type: ignore
+    repo.config.update_allowed_none_fields = allowed_none_fields  # type: ignore
     updated, db_item = repo.update_instance(instance=item, data=update_data)
     if expected_updated_flag is not updated:
         pytest.skip("update flag check failed. Test needs to be changed.")
@@ -329,6 +341,25 @@ def test_disable_items_direct_value(
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, bl=False)
     repo = MyModelRepo(db_sync_session)
+    disable_count = repo.disable(
+        ids_to_disable={item.id},
+        extra_filters={"id": item.id},
+    )
+    assert disable_count == 1
+    assert (
+        db_sync_session.scalar(
+            select(func.count()).select_from(MyModel).where(MyModel.bl.is_(False)),
+        )
+        == 0
+    )
+
+
+def test_disable_items_direct_value_with_instrumented_attributes(
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    item = mymodel_sync_factory(db_sync_session, bl=False)
+    repo = MyModelRepoWithInstrumentedAttributes(db_sync_session)
     disable_count = repo.disable(
         ids_to_disable={item.id},
         extra_filters={"id": item.id},

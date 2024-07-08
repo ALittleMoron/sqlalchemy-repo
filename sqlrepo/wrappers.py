@@ -29,7 +29,7 @@ def wrap_any_exception_manager() -> "Generator[None, None, Any]":
         raise QueryError(msg) from exc
     except BaseDevError as exc:
         msg = "error on python-dev-utils package level."
-        raise RepositoryError from exc
+        raise RepositoryError(msg) from exc
     except (AttributeError, TypeError, ValueError) as exc:
         msg = "error on python level."
-        raise BaseSQLRepoError from exc
+        raise BaseSQLRepoError(msg) from exc

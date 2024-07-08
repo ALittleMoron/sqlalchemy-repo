@@ -1,3 +1,4 @@
+from .config import RepositoryConfig as RepositoryConfig
 from .queries import BaseAsyncQuery as BaseAsyncQuery
 from .queries import BaseQuery as BaseQuery
 from .queries import BaseSyncQuery as BaseSyncQuery
