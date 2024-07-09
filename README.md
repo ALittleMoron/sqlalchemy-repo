@@ -79,7 +79,19 @@ class YourModelAsyncRepository(BaseAsyncRepository[YourModel]):
 ## Configuration
 
 sqlrepo Repository classes provide many options, which you can configure to make repositories
-work like you need:
+work like you need. To configure your repository class, You can use `RepositoryConfig` and init
+it in class body like this:
+
+```python
+from sqlrepo import BaseSyncRepository, RepositoryConfig
+
+from your_package.models import YourModel
+
+class YourModelSyncRepository(BaseSyncRepository[YourModel]):
+    config = RepositoryConfig(...)
+```
+
+Config params are the following:
 
 ### `model_class`
 
@@ -126,7 +138,12 @@ strings.
 from my_package.models import Admin
 
 class AdminRepository(BaseSyncRepository[Admin]):
-    specific_column_mapping = {"custom_field": Admin.id, "other_field": Admin.name}
+    config =RepositoryConfig(
+        specific_column_mapping={
+            "custom_field": Admin.id,
+            "other_field": Admin.name,
+        }
+    )
 
 
 admins = AdminRepository(session).list(
@@ -236,12 +253,6 @@ List of operators: `=, >, <, >=, <=, is, is_not, between, contains`.
 * `django-like` - `key-value` dict with django-like lookups system. See django docs for
 more info.
 
-### `load_strategy`
-
-Uses as choice of SQLAlchemy load strategies.
-
-By default selectinload, because it makes less errors.
-
 ## Unit of work
 
 sqlrepo provides unit of work base implementation to work with all your repositories in one place
@@ -313,6 +324,10 @@ supported.
 FastAPI extensions implements base classes for services and container, so you can work with your
 code easier.
 
+Attention! Container is good solution, if you want to simplify your work with services and
+repositories, but it cause situation, when you can access any services in any routes. It's not
+safe, so be careful.
+
 First of all You need to prepare all to work with plugin:
 
 ```python
@@ -349,8 +364,8 @@ then you should use plugin like this:
 ```python
 # your prepared code below
 
-from sqlrepo.ext.fastapi import add_container_overrides
-add_container_overrides(app, get_session)
+from sqlrepo.ext.fastapi import add_session_stub_overrides
+add_session_stub_overrides(app, get_session)
 ```
 
 then you can implements containers and services like this:
@@ -394,7 +409,7 @@ class Container(BaseSyncContainer):
 
     @cached_property
     def your_model_service(self):
-        return YourModelService(self.session, self.request)
+        return YourModelService(self.request, self.session)
 ```
 
 and finally you can use Container in your routes like this:

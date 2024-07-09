@@ -24,7 +24,7 @@ from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
 from sqlrepo.wrappers import wrap_any_exception_manager
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
     from logging import Logger
 
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     CompleteModel = tuple[Model, JoinClause, JoinKwargs]
     Join = str | Model | ModelWithOnclause | CompleteModel
     Filter = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]
-    Load = str | _AbstractLoad
+    Load = _AbstractLoad
     SearchParam = str | QueryableAttribute[Any]
     OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
     DataDict = dict[str, Any]
@@ -193,7 +193,6 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             session,
             self.config.get_filter_convert_class(),
             self.config.specific_column_mapping,
-            self.config.default_load_strategy,
             logger,
         )
 
@@ -236,8 +235,8 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
         search: str | None = None,
-        search_by: "Sequence[SearchParam] | None" = None,
-        order_by: "Sequence[OrderByParam] | None" = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
@@ -376,7 +375,6 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             session,
             self.config.get_filter_convert_class(),
             self.config.specific_column_mapping,
-            self.config.default_load_strategy,
             logger,
         )
 
@@ -419,8 +417,8 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         loads: "Sequence[Load] | None" = None,
         filters: "Filter | None" = None,
         search: str | None = None,
-        search_by: "Sequence[SearchParam] | None" = None,
-        order_by: "Sequence[OrderByParam] | None" = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":

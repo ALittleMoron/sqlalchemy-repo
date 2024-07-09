@@ -4,18 +4,18 @@ from inspect import isclass
 from typing import TYPE_CHECKING, Any, ForwardRef, Generic, TypeVar, get_args
 
 from dev_utils.verbose_http_exceptions import BaseVerboseHTTPException
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from pydantic import BaseModel, TypeAdapter
 from sqlalchemy.orm.decl_api import DeclarativeBase
 
 from sqlrepo.ext.fastapi.helpers import NotSet, NotSetType
 from sqlrepo.ext.fastapi.pagination import PaginatedResult, PaginationMeta
+from sqlrepo.ext.fastapi.stubs import _get_session_stub  # type: ignore
 from sqlrepo.logging import logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fastapi import Request
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.session import Session
 
@@ -179,7 +179,11 @@ class BaseAsyncService(BaseService[TModel, TDetailSchema, VListSchema]):
         """
         raise NotImplementedError()
 
-    def __init__(self, session: "AsyncSession", request: "Request") -> None:  # pragma: no coverage
+    def __init__(
+        self,
+        request: "Request",
+        session: "AsyncSession" = Depends(_get_session_stub),
+    ) -> None:  # pragma: no coverage
         self.session = session
         self.request = request
         self.init_repositories(session)
@@ -197,7 +201,11 @@ class BaseSyncService(BaseService[TModel, TDetailSchema, VListSchema]):
         """
         raise NotImplementedError()
 
-    def __init__(self, session: "Session", request: "Request") -> None:  # pragma: no coverage
+    def __init__(
+        self,
+        request: Request,
+        session: "Session" = Depends(_get_session_stub),
+    ) -> None:  # pragma: no coverage
         self.session = session
         self.request = request
         self.init_repositories(session)

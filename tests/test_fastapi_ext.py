@@ -11,7 +11,7 @@ from mimesis import Datetime, Locale, Text
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 from sqlalchemy.orm.session import Session
 
-from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService, add_container_overrides
+from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService, add_session_stub_overrides
 from sqlrepo.ext.fastapi.pagination import (
     AbstractBasePagination,
     LimitOffsetPagination,
@@ -116,25 +116,25 @@ class MyModelServiceWithPythonError(MyModelService):  # noqa: D101
 class Container(BaseSyncContainer):  # noqa: D101
     @cached_property
     def invalid_service(self) -> InvalidService:  # noqa: D102
-        return InvalidService(self.session, self.request)
+        return InvalidService(self.request, self.session)
 
     @cached_property
     def my_model_service(self) -> MyModelService:  # noqa: D102
-        return MyModelService(self.session, self.request)
+        return MyModelService(self.request, self.session)
 
     @cached_property
     def my_model_service_with_error_instance(self) -> MyModelServiceWithErrorInstance:  # noqa: D102
-        return MyModelServiceWithErrorInstance(self.session, self.request)
+        return MyModelServiceWithErrorInstance(self.request, self.session)
 
     @cached_property
     def my_model_service_with_verbose_exceptions(  # noqa: D102
         self,
     ) -> MyModelServiceWithVerboseExceptions:  # noqa: D102
-        return MyModelServiceWithVerboseExceptions(self.session, self.request)
+        return MyModelServiceWithVerboseExceptions(self.request, self.session)
 
     @cached_property
     def my_model_with_python_error(self) -> MyModelServiceWithPythonError:  # noqa: D102
-        return MyModelServiceWithPythonError(self.session, self.request)
+        return MyModelServiceWithPythonError(self.request, self.session)
 
 
 @pytest.fixture()
@@ -151,7 +151,7 @@ def get_sync_session_depends(  # noqa: ANN201
 @pytest.fixture()
 def app_with_sync_container(get_sync_session_depends: "Callable[..., Session]") -> "TestClient":
     app = FastAPI()
-    add_container_overrides(app, get_sync_session_depends)
+    add_session_stub_overrides(app, get_sync_session_depends)
     apply_verbose_http_exception_handler(app)
 
     @app.get('/get-one-invalid/{my_model_id}')

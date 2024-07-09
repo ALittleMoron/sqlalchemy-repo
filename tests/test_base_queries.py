@@ -3,11 +3,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from dev_utils.core.exc import NoModelRelationshipError  # type: ignore
+from dev_utils.core.exc import NoModelAttributeError
 from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # type: ignore
 from freezegun import freeze_time
-from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, text, update
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, update
+from sqlalchemy.orm import joinedload
 
 from sqlrepo.exc import QueryError
 from sqlrepo.queries import BaseQuery
@@ -17,33 +17,65 @@ now = datetime.datetime.now(tz=ZoneInfo("UTC"))
 
 
 @pytest.mark.parametrize(
-    ("specific_column_mapping", "elements", "expected_result"),
+    ("model", "specific_column_mapping", "elements", "expected_result"),
     [
         (
+            MyModel,
             None,
-            ["other_model_id", MyModel.name],
-            ["other_model_id", MyModel.name],
+            [MyModel.name],
+            [MyModel.name],
         ),
         (
+            OtherModel,
             {"other_model_id": OtherModel.id, "some_other_model_field": OtherModel.name},
-            ["other_model_id", MyModel.name],
-            [OtherModel.id, MyModel.name],
-        ),
-        (
-            {"other_model_id": OtherModel.id, "some_other_model_field": OtherModel.name},
-            ["not_presented_field", "other_model_id"],
-            ["not_presented_field", OtherModel.id],
+            ["other_model_id", "some_other_model_field"],
+            [OtherModel.id, OtherModel.name],
         ),
     ],
 )
 def test_resolve_specific_columns(  # noqa
+    model: Any,  # noqa: ANN401
     specific_column_mapping: Any,  # noqa: ANN401
     elements: list[str | ColumnElement[Any]],
     expected_result: list[str | ColumnElement[Any]],  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter, specific_column_mapping)
-    converted_columns = query._resolve_specific_columns(elements=elements)  # type: ignore
+    converted_columns = query._resolve_specific_columns(model=model, elements=elements)  # type: ignore
     assert converted_columns == expected_result
+
+
+@pytest.mark.parametrize(
+    ("model", "elements", "exception", "match"),
+    [
+        (
+            MyModel,
+            ["other_model_id_field"],
+            NoModelAttributeError,
+            None,
+        ),
+        (
+            OtherModel,
+            ["other_model_id_field", "some_other_model_field"],
+            NoModelAttributeError,
+            None,
+        ),
+        (
+            MyModel,
+            [25],
+            ValueError,
+            "Type of 0 element of given elements is incorrect. Type: <class 'int'>",
+        ),
+    ],
+)
+def test_resolve_specific_columns_error(  # noqa
+    model: Any,  # noqa: ANN401
+    elements: list[str | ColumnElement[Any]],
+    exception: type[Exception],
+    match: str | None,
+) -> None:
+    query = BaseQuery(SimpleFilterConverter, None)
+    with pytest.raises(exception, match=match):
+        query._resolve_specific_columns(model=model, elements=elements)  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -89,46 +121,6 @@ def test_resolve_and_apply_joins(  # noqa
     query = BaseQuery(SimpleFilterConverter)
     new_stmt = query._resolve_and_apply_joins(stmt=stmt, joins=joins)  # type: ignore
     assert str(new_stmt) == str(expected_result)
-
-
-@pytest.mark.parametrize(
-    ("stmt", "strategy", "loads", "expected_result"),
-    [
-        (
-            select(MyModel),
-            joinedload,
-            ["other_models"],
-            select(MyModel).options(joinedload(MyModel.other_models)),
-        ),
-        (
-            select(MyModel),
-            selectinload,
-            ["other_models"],
-            select(MyModel).options(selectinload(MyModel.other_models)),
-        ),
-        (
-            select(MyModel),
-            selectinload,
-            "other_models",
-            select(MyModel).options(selectinload(MyModel.other_models)),
-        ),
-    ],
-)
-def test_resolve_and_apply_loads(  # noqa
-    stmt: Any,  # noqa
-    strategy: Any,  # noqa
-    loads: Any,  # noqa
-    expected_result: Any,  # noqa
-) -> None:
-    query = BaseQuery(SimpleFilterConverter, load_strategy=strategy)
-    new_stmt = query._resolve_and_apply_loads(stmt=stmt, loads=loads)  # type: ignore
-    assert str(new_stmt) == str(expected_result)
-
-
-def test_resolve_and_apply_loads_incorrect():  # noqa
-    query = BaseQuery(SimpleFilterConverter)
-    with pytest.raises(NoModelRelationshipError):
-        query._resolve_and_apply_loads(stmt=select(MyModel), loads=["incorrect"])  # type: ignore
 
 
 @pytest.mark.parametrize(
@@ -265,7 +257,7 @@ def test_make_search_filter(  # noqa
         (
             None,
             None,
-            ["other_models"],
+            [joinedload(MyModel.other_models)],
             select(MyModel).options(joinedload(MyModel.other_models)),
         ),
     ],
@@ -389,12 +381,67 @@ def test_get_items_count_stmt(  # noqa
             None,
             None,
             None,
+            "somevalue",
+            MyModel.name,
             None,
             None,
-            ("some_value",),
+            None,
+            select(MyModel).where(MyModel.name.ilike(r"%somevalue%")),
+        ),
+        (
             None,
             None,
-            select(MyModel).order_by(text("some_value")),
+            None,
+            "somevalue",
+            "name",
+            None,
+            None,
+            None,
+            select(MyModel).where(MyModel.name.ilike(r"%somevalue%")),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            ("name",),
+            None,
+            None,
+            select(MyModel).order_by(MyModel.name),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            "name",
+            None,
+            None,
+            select(MyModel).order_by(MyModel.name),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            ("-name",),
+            None,
+            None,
+            select(MyModel).order_by(MyModel.name.desc()),
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            None,
+            "-name",
+            None,
+            None,
+            select(MyModel).order_by(MyModel.name.desc()),
         ),
         (
             None,

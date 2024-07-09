@@ -1,5 +1,4 @@
 import datetime
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias
 
@@ -10,14 +9,12 @@ from dev_utils.sqlalchemy.filters.converters import (
     SimpleFilterConverter,
 )
 from dev_utils.sqlalchemy.filters.types import FilterConverterStrategiesLiteral
-from sqlalchemy.orm import selectinload
 
 StrField: TypeAlias = str
 
 
 if TYPE_CHECKING:
     from sqlalchemy.orm.attributes import InstrumentedAttribute
-    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore
 
 
 filter_convert_classes: Final[dict[FilterConverterStrategiesLiteral, type[BaseFilterConverter]]] = {
@@ -25,7 +22,7 @@ filter_convert_classes: Final[dict[FilterConverterStrategiesLiteral, type[BaseFi
     "advanced": AdvancedOperatorFilterConverter,
     "django": DjangoLikeFilterConverter,
 }
-"""Final convert class filters mapping."""
+"""Convert class filters mapping."""
 
 
 @dataclass(slots=True)
@@ -139,13 +136,6 @@ class RepositoryConfig:
 
         ``django-like`` - ``key-value`` dict with django-like lookups system. See django docs for
         more info.
-    """
-    # FIXME: remove it. Will cause many errors. Just pass _AbstractLoad instances itself. Not str
-    default_load_strategy: Callable[..., "_AbstractLoad"] = field(default=selectinload)
-    """
-    Uses as choice of SQLAlchemy load strategies.
-
-    By default selectinload, because it makes less errors.
     """
 
     def get_filter_convert_class(self) -> type[BaseFilterConverter]:

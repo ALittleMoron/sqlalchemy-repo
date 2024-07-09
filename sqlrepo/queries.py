@@ -2,15 +2,25 @@
 
 import datetime
 import re
-from collections.abc import Callable
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar, overload
 
 from dev_utils.core.utils import get_utc_now
 from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
-from dev_utils.sqlalchemy.utils import apply_joins, apply_loads, get_sqlalchemy_attribute
-from sqlalchemy import CursorResult, and_, delete, func, insert, or_, select, text, update
+from dev_utils.sqlalchemy.guards import is_queryable_attribute
+from dev_utils.sqlalchemy.utils import apply_joins, get_sqlalchemy_attribute
+from sqlalchemy import (
+    CursorResult,
+    and_,
+    delete,
+    desc,
+    func,
+    insert,
+    or_,
+    select,
+    update,
+)
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy.orm import joinedload
 
 from sqlrepo.exc import QueryError
 from sqlrepo.logging import logger as default_logger
@@ -49,7 +59,7 @@ if TYPE_CHECKING:
     CompleteModel = tuple[Model, JoinClause, JoinKwargs]
     Join = str | Model | ModelWithOnclause | CompleteModel
     Filter = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]
-    Load = str | _AbstractLoad
+    Load = _AbstractLoad
     SearchParam = str | QueryableAttribute[Any]
     ColumnParam = str | QueryableAttribute[Any]
     OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
@@ -67,28 +77,37 @@ class BaseQuery:
         self,
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        load_strategy: Callable[..., "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
         self.specific_column_mapping = specific_column_mapping
         self.filter_converter_class = filter_converter_class
-        self.load_strategy = load_strategy
         self.logger = logger
 
     def _resolve_specific_columns(
         self,
         *,
-        elements: "Sequence[T]",
-    ) -> "Sequence[T]":
+        model: "Model",
+        elements: "Iterable[Any]",
+    ) -> "Iterable[ColumnElement[Any] | QueryableAttribute[Any]]":
         """Get all SQLAlchemy columns from strings (uses specific columns)."""
-        if not self.specific_column_mapping:
-            return elements
-        new_elements: "list[T]" = []
-        for ele in elements:
-            if not isinstance(ele, str) or ele not in self.specific_column_mapping:
+        new_elements: "list[ColumnElement[Any] | QueryableAttribute[Any]]" = []
+        for idx, ele in enumerate(elements):
+            if is_queryable_attribute(ele):
                 new_elements.append(ele)
-            else:
+            elif isinstance(ele, str) and ele in (self.specific_column_mapping or set()):
                 new_elements.append(self.specific_column_mapping[ele])  # type: ignore
+            elif isinstance(ele, str):
+                func = None
+                if ele.startswith('-'):
+                    func = desc
+                    ele = ele[1:]
+                attr = get_sqlalchemy_attribute(model, ele)
+                if func is not None:
+                    attr = func(attr)
+                new_elements.append(attr)
+            else:
+                msg = f'Type of {idx} element of given elements is incorrect. Type: {type(ele)}'
+                raise ValueError(msg)
         return new_elements
 
     def _resolve_and_apply_joins(
@@ -113,22 +132,6 @@ class BaseQuery:
                 stmt = apply_joins(stmt, join)
             else:
                 stmt = stmt.join(join)
-        return stmt
-
-    def _resolve_and_apply_loads(
-        self,
-        *,
-        stmt: "Select[tuple[T]]",
-        loads: "Sequence[Load]",
-    ) -> "Select[tuple[T]]":
-        if isinstance(loads, str):
-            loads = [loads]
-        for load in loads:
-            stmt = (
-                apply_loads(stmt, load, load_strategy=self.load_strategy)
-                if isinstance(load, str)
-                else stmt.options(load)
-            )
         return stmt
 
     def _make_disable_filters(  # noqa: C901
@@ -164,10 +167,11 @@ class BaseQuery:
     ) -> "ColumnElement[bool]":
         """Generate search filters from given data."""
         filters: list["ColumnElement[bool]"] = []
-        search_by_args = self._resolve_specific_columns(elements=search_by_args)  # type: ignore
-        for search_by in search_by_args:
-            if isinstance(search_by, str):
-                search_by = get_sqlalchemy_attribute(model, search_by)
+        search_by_args_resolved = self._resolve_specific_columns(
+            model=model,
+            elements=search_by_args,
+        )
+        for search_by in search_by_args_resolved:
             (
                 filters.append(search_by.ilike(f"%{search}%"))
                 if case_insensitive
@@ -190,10 +194,7 @@ class BaseQuery:
         if joins is not None:
             stmt = self._resolve_and_apply_joins(stmt=stmt, joins=joins)
         if loads is not None:
-            stmt = self._resolve_and_apply_loads(
-                stmt=stmt,
-                loads=loads,
-            )
+            stmt = stmt.options(*loads)
         if filters is not None:
             sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
@@ -223,8 +224,8 @@ class BaseQuery:
         loads: "Sequence[Load] | None" = None,
         filters: "Filter | None" = None,
         search: str | None = None,
-        search_by: "Sequence[SearchParam] | None" = None,
-        order_by: "Sequence[OrderByParam] | None" = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Select[tuple[BaseSQLAlchemyModel]]":
@@ -233,12 +234,13 @@ class BaseQuery:
         if search is not None and search_by is not None:
             search = re.escape(search)
             search = search.translate(str.maketrans({"%": r"\%", "_": r"\_", "/": r"\/"}))
+            if isinstance(search_by, str) or not isinstance(search_by, Iterable):
+                search_by = (search_by,)
             stmt = stmt.where(self._make_search_filter(search, model, *search_by))
         if order_by is not None:
-            order_by_resolved = self._resolve_specific_columns(elements=order_by)
-            order_by_resolved = [
-                text(ele) if isinstance(ele, str) else ele for ele in order_by_resolved
-            ]
+            if isinstance(order_by, str) or not isinstance(order_by, Iterable):
+                order_by = (order_by,)
+            order_by_resolved = self._resolve_specific_columns(model=model, elements=order_by)
             stmt = stmt.order_by(*order_by_resolved)
         if limit is not None:
             stmt = stmt.limit(limit)
@@ -351,11 +353,10 @@ class BaseSyncQuery(BaseQuery):
         session: "Session",
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        load_strategy: Callable[[Any], "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
         self.session = session
-        super().__init__(filter_converter_class, specific_column_mapping, load_strategy, logger)
+        super().__init__(filter_converter_class, specific_column_mapping, logger)
 
     def get_item(
         self,
@@ -402,8 +403,8 @@ class BaseSyncQuery(BaseQuery):
         loads: "Sequence[Load] | None" = None,
         filters: "Filter | None" = None,
         search: str | None = None,
-        search_by: "Sequence[SearchParam] | None" = None,
-        order_by: "Sequence[OrderByParam] | None" = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
@@ -660,11 +661,10 @@ class BaseAsyncQuery(BaseQuery):
         session: "AsyncSession",
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        load_strategy: Callable[..., "_AbstractLoad"] = joinedload,
         logger: "Logger" = default_logger,
     ) -> None:
         self.session = session
-        super().__init__(filter_converter_class, specific_column_mapping, load_strategy, logger)
+        super().__init__(filter_converter_class, specific_column_mapping, logger)
 
     async def get_item(
         self,
@@ -711,8 +711,8 @@ class BaseAsyncQuery(BaseQuery):
         loads: "Sequence[Load] | None" = None,
         filters: "Filter | None" = None,
         search: str | None = None,
-        search_by: "Sequence[SearchParam] | None" = None,
-        order_by: "Sequence[OrderByParam] | None" = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,

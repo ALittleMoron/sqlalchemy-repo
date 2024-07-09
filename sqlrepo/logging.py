@@ -29,4 +29,5 @@ LOGGER_CONFIG = {
 
 
 logging.config.dictConfig(LOGGER_CONFIG)
+# TODO: replace to structlog
 logger = logging.getLogger("sqlrepo")
