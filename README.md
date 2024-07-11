@@ -138,7 +138,7 @@ strings.
 from my_package.models import Admin
 
 class AdminRepository(BaseSyncRepository[Admin]):
-    config =RepositoryConfig(
+    config = RepositoryConfig(
         specific_column_mapping={
             "custom_field": Admin.id,
             "other_field": Admin.name,
