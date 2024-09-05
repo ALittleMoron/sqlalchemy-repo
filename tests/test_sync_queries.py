@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # type: ignore
+from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter
 from mimesis import Datetime, Locale, Text
 from sqlalchemy import func, select
 
@@ -144,7 +144,7 @@ def test_db_create(
 ) -> None:
     query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
     db_item = query_obj.db_create(model=MyModel, data=create_data, use_flush=use_flush)
-    if not isinstance(db_item, MyModel):  # type: ignore
+    if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 
@@ -215,7 +215,7 @@ def test_create_item(
 ) -> None:
     query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
     db_item = query_obj.create_item(model=MyModel, data=create_data, use_flush=use_flush)
-    if not isinstance(db_item, MyModel):  # type: ignore
+    if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 

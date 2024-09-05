@@ -13,7 +13,7 @@ async def test_skip_session_use(
 ) -> None:
     class SkipUOW(BaseAsyncUnitOfWork):
         __skip_session_use__ = True
-        session_factory = db_async_session_factory  # type: ignore
+        session_factory = db_async_session_factory
 
         def init_repositories(self, session: AsyncSession) -> None:
             pass
@@ -29,7 +29,7 @@ async def test_incorrect_uow_usage(
     db_async_session_factory: async_scoped_session[AsyncSession],
 ) -> None:
     class IncorrectUOW(BaseAsyncUnitOfWork):
-        session_factory = db_async_session_factory  # type: ignore
+        session_factory = db_async_session_factory
 
         def init_repositories(self, session: AsyncSession) -> None:
             pass
@@ -47,7 +47,7 @@ async def test_raise_in_context_manager(
     db_async_session_factory: async_scoped_session[AsyncSession],
 ) -> None:
     class CorrectUOW(BaseAsyncUnitOfWork):
-        session_factory = db_async_session_factory  # type: ignore
+        session_factory = db_async_session_factory
 
         def init_repositories(self, session: AsyncSession) -> None:
             pass

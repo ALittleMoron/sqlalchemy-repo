@@ -1,37 +1,5 @@
 [tool.ruff]
-lint.select = [
-    "A",
-    "B",
-    "D",
-    "E",
-    "F",
-    "G",
-    "N",
-    "Q",
-    "S",
-    "C90",
-    "UP",
-    "ANN",
-    "PLR",
-    "ASYNC",
-    "FBT",
-    "COM",
-    "COM",
-    "DTZ",
-    "DJ",
-    "EM",
-    "ICN",
-    "PIE",
-    "T20",
-    "PYI",
-    "PT",
-    "SIM",
-    "TCH",
-    "INT",
-    "PTH",
-    "ERA",
-    "TRY",
-]
+lint.select = ["ALL"]
 line-length = 100
 output-format = "full"
 exclude = [
@@ -56,6 +24,8 @@ lint.ignore = [
     "ANN101",
     "ANN102",
     "PLR0913",
+    "UP037",
+    "PLC0414",
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -135,7 +105,7 @@ distribution = true
 
 [tool.pdm.dev-dependencies]
 dev = [
-    "ruff>=0.3.4",
+    "ruff>=0.5.5",
     "vulture>=2.11",
     "pytest>=8.1.1",
     "black>=24.3.0",
@@ -156,6 +126,9 @@ dev = [
     "ipython>=8.19.0",
 ]
 
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
 
 [project]
 name = "sqlrepo"
@@ -166,12 +139,14 @@ requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
 dependencies = [
-    "sqlalchemy>=2.0.29",
-    "python-dev-utils[sqlalchemy_filters]>=2.3.0",
+    "sqlalchemy>=2.0",
+    "python-dev-utils>=7.0.1",
+    "sqlalchemy-dev-utils>=1.0.1",
+    "sqlalchemy-filter-converter>=1.3.0",
 ]
 
 [project.optional-dependencies]
-fastapi = ["fastapi>=0.100"]
+fastapi = ["fastapi>=0.100", "verbose_http_exceptions>=1.1.1"]
 
 [build-system]
 requires = ["pdm-backend"]

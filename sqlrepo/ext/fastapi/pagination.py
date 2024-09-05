@@ -68,7 +68,7 @@ class AbstractBasePagination:
     current_page: int
 
     def __init__(self) -> None:  # pragma: no coverage
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class LimitOffsetPagination(AbstractBasePagination):

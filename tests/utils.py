@@ -7,7 +7,11 @@ from sqlalchemy import ForeignKey, inspect
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy_utils import create_database, database_exists, drop_database  # type: ignore
+from sqlalchemy_utils import (  # type: ignore[reportMissingTypeStubs]
+    create_database,  # type: ignore[reportMissingTypeStubs]
+    database_exists,  # type: ignore[reportMissingTypeStubs]
+    drop_database,  # type: ignore[reportMissingTypeStubs]
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,9 +38,13 @@ def destroy_db(uri: str) -> None:
         drop_database(uri)
 
 
-def generate_datetime_list(*, n: int = 10, tz: Any = None) -> list[datetime.datetime]:  # noqa
+def generate_datetime_list(
+    *,
+    n: int = 10,
+    tz: Any = None,  # noqa: ANN401
+) -> list[datetime.datetime]:
     """Generate list of datetimes of given length with or without timezone."""
-    now = datetime.datetime.now(tz=tz)  # type: ignore
+    now = datetime.datetime.now(tz=tz)
     res = [now]
     for i in range(1, n):
         delta = datetime.timedelta(days=i)
@@ -73,8 +81,8 @@ def assert_compare_db_item_list(
     """Assert if 2 model lists not compare to each other."""
     assert len(items1) == len(items2), f"Different lists count: {len(items1)} != {len(items2)}"
     for item1, item2 in zip(
-        sorted(items1, key=lambda x: x.id),  # type: ignore
-        sorted(items2, key=lambda x: x.id),  # type: ignore
+        sorted(items1, key=lambda x: x.id),  # type: ignore[reportAttributeAccessIssue]
+        sorted(items2, key=lambda x: x.id),  # type: ignore[reportAttributeAccessIssue]
         strict=True,
     ):
         assert_compare_db_items(item1, item2)
@@ -183,14 +191,14 @@ async def create_db_item_async(
     return item
 
 
-class Base(DeclarativeBase):  # noqa
+class Base(DeclarativeBase):  # noqa: D101
     pass
 
 
-class MyModel(Base):  # noqa
+class MyModel(Base):  # noqa: D101
     __tablename__ = "my_model"
 
-    id: Mapped[int] = mapped_column(primary_key=True)  # noqa
+    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str | None]
     other_name: Mapped[str | None]
     dt: Mapped[datetime.datetime | None]
@@ -198,27 +206,27 @@ class MyModel(Base):  # noqa
     other_models: Mapped[list["OtherModel"]] = relationship(back_populates="my_model", uselist=True)
 
     @hybrid_property
-    def full_name(self):  # noqa # type: ignore
-        return self.name + "" + self.other_name  # type: ignore
+    def full_name(self):
+        return self.name + "" + self.other_name
 
     @hybrid_method
-    def get_full_name(self):  # noqa # type: ignore
-        return self.name + "" + self.other_name  # type: ignore
+    def get_full_name(self):
+        return self.name + "" + self.other_name
 
 
-class OtherModel(Base):  # noqa
+class OtherModel(Base):  # noqa: D101
     __tablename__ = "other_model"
 
-    id: Mapped[int] = mapped_column(primary_key=True)  # noqa
+    id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     other_name: Mapped[str]
     my_model_id: Mapped[int | None] = mapped_column(ForeignKey("my_model.id", ondelete="CASCADE"))
     my_model: Mapped["MyModel"] = relationship(back_populates="other_models", uselist=False)
 
     @hybrid_property
-    def full_name(self):  # noqa
+    def full_name(self):
         return self.name + "" + self.other_name
 
     @hybrid_method
-    def get_full_name(self):  # noqa
+    def get_full_name(self):
         return self.name + "" + self.other_name

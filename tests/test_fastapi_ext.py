@@ -95,8 +95,8 @@ class InvalidService(MyModelService):  # noqa: D101
     ...
 
 
-InvalidService.detail_schema = NotSet  # type: ignore
-InvalidService.list_schema = NotSet  # type: ignore
+InvalidService.detail_schema = NotSet
+InvalidService.list_schema = NotSet
 InvalidService.not_found_message = NotSet
 InvalidService.not_found_exception = NotSet
 
@@ -155,45 +155,51 @@ def app_with_sync_container(get_sync_session_depends: "Callable[..., Session]") 
     apply_verbose_http_exception_handler(app)
 
     @app.get('/get-one-invalid/{my_model_id}')
-    def get_one_invalid(my_model_id: int = Path(), container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_one_invalid(
+        my_model_id: int = Path(), container: Container = Depends()
+    ):  # noqa: ANN202
         return container.invalid_service.get_by_id(my_model_id)
 
     @app.get('/get-one/{my_model_id}')
-    def get_one(my_model_id: int = Path(), container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_one(my_model_id: int = Path(), container: Container = Depends()):  # noqa: ANN202
         return container.my_model_service.get_by_id(my_model_id)
 
     @app.get('/get-one-instance/{my_model_id}')
-    def get_one_instance(my_model_id: int = Path(), container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_one_instance(
+        my_model_id: int = Path(), container: Container = Depends()
+    ):  # noqa: ANN202
         return container.my_model_service_with_error_instance.get_by_id(my_model_id)
 
     @app.get('/get-one-verbose/{my_model_id}')
-    def get_one_verbose(my_model_id: int = Path(), container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_one_verbose(
+        my_model_id: int = Path(), container: Container = Depends()
+    ):  # noqa: ANN202
         return container.my_model_service_with_verbose_exceptions.get_by_id(my_model_id)
 
     @app.get('/get-one-python/{my_model_id}')
-    def get_one_python(my_model_id: int = Path(), container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_one_python(my_model_id: int = Path(), container: Container = Depends()):  # noqa: ANN202
         return container.my_model_with_python_error.get_by_id(my_model_id)
 
     @app.get('/get-all/')
-    def get_all(container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_all(container: Container = Depends()):  # noqa: ANN202
         return container.my_model_service.list()
 
     @app.get('/get-limit-offset-paginated/')
-    def get_paginated_limit_offset(  # type: ignore # noqa: ANN202
+    def get_paginated_limit_offset(  # noqa: ANN202
         pagination: LimitOffsetPagination = Depends(),
         container: Container = Depends(),
     ):
         return container.my_model_service.list_paginated(pagination)
 
     @app.get('/get-page-size-paginated/')
-    def get_paginated_page_size(  # type: ignore # noqa: ANN202
+    def get_paginated_page_size(  # noqa: ANN202
         pagination: PageSizePagination = Depends(),
         container: Container = Depends(),
     ):
         return container.my_model_service.list_paginated(pagination)
 
     @app.get('/get-all-invalid/')
-    def get_all_invalid(container: Container = Depends()):  # type: ignore # noqa: ANN202
+    def get_all_invalid(container: Container = Depends()):  # noqa: ANN202
         return container.invalid_service.list()
 
     return TestClient(app)
@@ -341,14 +347,14 @@ def test_invalid_methods(
 def test_inherit_skip() -> None:
     assert BaseSyncService.__inheritance_check_model_class__ is True
 
-    class MyService(BaseSyncService):  # type: ignore
+    class MyService(BaseSyncService):
         __inheritance_check_model_class__ = False
 
     assert MyService.__inheritance_check_model_class__ is True
 
 
 def test_already_set_schemas() -> None:
-    class MyService(BaseSyncService[MyModel, MyModelDetail, MyModelList]):  # type: ignore
+    class MyService(BaseSyncService[MyModel, MyModelDetail, MyModelList]):
         detail_schema = MyModelDetail
         list_schema = MyModelList
 
@@ -356,16 +362,14 @@ def test_already_set_schemas() -> None:
 def test_cant_eval_forward_ref() -> None:
     with pytest.warns(ServiceClassIncorrectUseWarning):
 
-        class MyTestService(BaseSyncService["OtherModel", "OtherDetail", "OtherList"]):  # type: ignore
-            ...
+        class MyTestService(BaseSyncService["OtherModel", "OtherDetail", "OtherList"]): ...
 
 
 def test_can_eval_forward_ref() -> None:
-    class MyTestService(BaseSyncService["MyModel", "MyModelDetail", "MyModelList"]):  # type: ignore
-        ...
+    class MyTestService(BaseSyncService["MyModel", "MyModelDetail", "MyModelList"]): ...
 
-    assert MyTestService.detail_schema is not NotSet  # type: ignore
-    assert MyTestService.list_schema is not NotSet  # type: ignore
+    assert MyTestService.detail_schema is not NotSet
+    assert MyTestService.list_schema is not NotSet
 
 
 def test_generic_incorrect_type() -> None:
@@ -374,8 +378,7 @@ def test_generic_incorrect_type() -> None:
         match="Passed GenericType is not pydantic BaseModel subclass.",
     ):
 
-        class MyService(BaseSyncService[int, int, int]):  # type: ignore
-            ...
+        class MyService(BaseSyncService[int, int, int]): ...
 
 
 def test_no_generic() -> None:
@@ -384,5 +387,4 @@ def test_no_generic() -> None:
         match="GenericType was not passed for pydantic BaseModel subclass.",
     ):
 
-        class MyService(BaseSyncService):  # type: ignore
-            ...
+        class MyService(BaseSyncService): ...

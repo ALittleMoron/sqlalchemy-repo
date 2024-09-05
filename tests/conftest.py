@@ -110,12 +110,12 @@ def db_sync_engine(db_sync_url: str) -> "Generator[Engine, None, None]":
     destroy_db(db_sync_url)
 
 
-@pytest_asyncio.fixture(scope="session")  # type: ignore
+@pytest_asyncio.fixture(scope="session")  # type: ignore[reportUntypedFunctionDecorator]
 async def db_async_engine(
     db_async_url: str,
-    db_name: str,
-    db_sync_engine: "Engine",
-) -> "AsyncGenerator[AsyncEngine, None]":  # type: ignore
+    db_name: str,  # noqa: ARG001
+    db_sync_engine: "Engine",  # noqa: ARG001
+) -> "AsyncGenerator[AsyncEngine, None]":
     """SQLAlchemy engine session-based fixture."""
     engine = create_async_engine(db_async_url, echo=True, pool_pre_ping=True)
     try:
@@ -136,7 +136,7 @@ def db_sync_session_factory(db_sync_engine: "Engine") -> "scoped_session[Session
     )
 
 
-@pytest.fixture(scope="session")  # type: ignore
+@pytest.fixture(scope="session")
 def db_async_session_factory(
     db_async_engine: "AsyncEngine",
 ) -> "async_scoped_session[AsyncSession]":
@@ -163,7 +163,7 @@ def db_sync_session(
     Base.metadata.drop_all(db_sync_engine)
 
 
-@pytest_asyncio.fixture()  # type: ignore
+@pytest_asyncio.fixture()  # type: ignore[reportUntypedFunctionDecorator]
 async def db_async_session(
     db_async_engine: "AsyncEngine",
     db_async_session_factory: "async_scoped_session[AsyncSession]",
@@ -189,12 +189,12 @@ def mymodel_sync_factory(
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
     ) -> MyModel:
-        params: dict[str, Any] = dict(
-            name=text_faker.sentence(),
-            other_name=text_faker.sentence(),
-            dt=dt_faker.datetime(),
-            bl=coin_flip(),
-        )
+        params: dict[str, Any] = {
+            "name": text_faker.sentence(),
+            "other_name": text_faker.sentence(),
+            "dt": dt_faker.datetime(),
+            "bl": coin_flip(),
+        }
         params.update(kwargs)
         return create_db_item_sync(session, MyModel, params, commit=commit)
 
@@ -218,11 +218,11 @@ def othermodel_sync_factory(
             model_id = mymodel_sync_factory(session, commit=commit).id
         else:
             model_id = kwargs.pop("model_id")
-        params: dict[str, Any] = dict(
-            name=text_faker.sentence(),
-            other_name=text_faker.sentence(),
-            model_id=model_id,
-        )
+        params: dict[str, Any] = {
+            "name": text_faker.sentence(),
+            "other_name": text_faker.sentence(),
+            "model_id": model_id,
+        }
         params.update(kwargs)
         return create_db_item_sync(session, OtherModel, params, commit=commit)
 
@@ -242,12 +242,12 @@ def mymodel_async_factory(
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
     ) -> MyModel:
-        params: dict[str, Any] = dict(
-            name=text_faker.sentence(),
-            other_name=text_faker.sentence(),
-            dt=dt_faker.datetime(),
-            bl=coin_flip(),
-        )
+        params: dict[str, Any] = {
+            "name": text_faker.sentence(),
+            "other_name": text_faker.sentence(),
+            "dt": dt_faker.datetime(),
+            "bl": coin_flip(),
+        }
         params.update(kwargs)
         return await create_db_item_async(session, MyModel, params, commit=commit)
 
@@ -272,11 +272,11 @@ def othermodel_async_factory(
             model_id = model.id
         else:
             model_id = kwargs.pop("model_id")
-        params: dict[str, Any] = dict(
-            name=text_faker.sentence(),
-            other_name=text_faker.sentence(),
-            model_id=model_id,
-        )
+        params: dict[str, Any] = {
+            "name": text_faker.sentence(),
+            "other_name": text_faker.sentence(),
+            "model_id": model_id,
+        }
         params.update(kwargs)
         return await create_db_item_async(session, OtherModel, params, commit=commit)
 

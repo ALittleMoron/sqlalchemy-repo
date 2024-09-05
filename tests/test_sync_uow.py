@@ -10,7 +10,7 @@ from sqlrepo.uow import BaseSyncUnitOfWork
 def test_skip_session_use(db_sync_session_factory: scoped_session[Session]) -> None:
     class SkipUOW(BaseSyncUnitOfWork):
         __skip_session_use__ = True
-        session_factory = db_sync_session_factory  # type: ignore
+        session_factory = db_sync_session_factory
 
         def init_repositories(self, session: Session) -> None:
             pass
@@ -23,7 +23,7 @@ def test_skip_session_use(db_sync_session_factory: scoped_session[Session]) -> N
 
 def test_incorrect_uow_usage(db_sync_session_factory: scoped_session[Session]) -> None:
     class IncorrectUOW(BaseSyncUnitOfWork):
-        session_factory = db_sync_session_factory  # type: ignore
+        session_factory = db_sync_session_factory
 
         def init_repositories(self, session: Session) -> None:
             pass
@@ -39,7 +39,7 @@ def test_incorrect_uow_usage(db_sync_session_factory: scoped_session[Session]) -
 
 def test_raise_in_context_manager(db_sync_session_factory: scoped_session[Session]) -> None:
     class CorrectUOW(BaseSyncUnitOfWork):
-        session_factory = db_sync_session_factory  # type: ignore
+        session_factory = db_sync_session_factory
 
         def init_repositories(self, session: Session) -> None:
             pass

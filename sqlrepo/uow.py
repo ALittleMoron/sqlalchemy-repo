@@ -2,14 +2,12 @@
 
 import types
 from abc import ABC, abstractmethod
-from typing import Self
 
-from dev_utils.core.abstract import Abstract, abstract_class_property
+from dev_utils.abstract import Abstract, abstract_class_property
 from sqlalchemy.ext.asyncio import AsyncSession, async_scoped_session, async_sessionmaker
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 from sqlrepo.exc import NonContextManagerUOWUsageError
-from sqlrepo.logging import logger
 
 _uow_non_context_manager_usage_msg = (
     "Unit of work only provide context manager access. "
@@ -33,21 +31,20 @@ class BaseAsyncUnitOfWork(ABC, Abstract):
 
         Define your own method for it and specify your own methods for working with repositories.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    async def __aenter__(self) -> Self:  # noqa: D105
+    async def __aenter__(self):  # noqa: ANN204, D105
         self.session = self.session_factory()
         self.init_repositories(self.session)
         return self
 
     async def __aexit__(  # noqa: D105
         self,
-        exc_type: type[BaseException] | None,  # noqa
+        exc_type: type[BaseException] | None,
         exc: BaseException | None,
-        traceback: types.TracebackType | None,  # noqa
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc:  # pragma: no coverage
-            logger.error("UNIT-OF-WORK E0: %s", exc)
             await self.rollback()
         else:
             await self.commit()
@@ -92,21 +89,20 @@ class BaseSyncUnitOfWork(ABC, Abstract):
 
         Define your own method for it and specify your own methods for working with repositories.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
-    def __enter__(self) -> Self:  # noqa: D105
+    def __enter__(self):  # noqa: ANN204, D105
         self.session = self.session_factory()
         self.init_repositories(self.session)
         return self
 
     def __exit__(  # noqa: D105
         self,
-        exc_type: type[BaseException] | None,  # noqa
+        exc_type: type[BaseException] | None,
         exc: BaseException | None,
-        traceback: types.TracebackType | None,  # noqa
+        traceback: types.TracebackType | None,
     ) -> None:
         if exc:  # pragma: no coverage
-            logger.error("UNIT-OF-WORK E0: %s", exc)
             self.rollback()
         else:
             self.commit()

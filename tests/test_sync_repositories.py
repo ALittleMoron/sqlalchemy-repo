@@ -135,7 +135,7 @@ def test_db_create(
 ) -> None:
     repo = MyModelRepo(db_sync_session)
     db_item = repo.create(data=create_data)
-    if not isinstance(db_item, MyModel):  # type: ignore
+    if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 
@@ -171,7 +171,7 @@ def test_create_item(
 ) -> None:
     repo = MyModelRepo(db_sync_session)
     db_item = repo.create(data=create_data)
-    if not isinstance(db_item, MyModel):  # type: ignore
+    if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
 
@@ -290,8 +290,8 @@ def test_change_item_none_check(
 ) -> None:
     item = mymodel_sync_factory(db_sync_session)
     repo = MyModelRepo(db_sync_session)
-    repo.config.update_set_none = set_none  # type: ignore
-    repo.config.update_allowed_none_fields = allowed_none_fields  # type: ignore
+    repo.config.update_set_none = set_none
+    repo.config.update_allowed_none_fields = allowed_none_fields
     updated, db_item = repo.update_instance(instance=item, data=update_data)
     if expected_updated_flag is not updated:
         pytest.skip("update flag check failed. Test needs to be changed.")

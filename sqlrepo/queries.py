@@ -1,14 +1,13 @@
 """Queries classes with executable statements and methods with them."""
 
 import datetime
+import functools
 import re
+import warnings
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar, overload
 
-from dev_utils.core.utils import get_utc_now
-from dev_utils.sqlalchemy.filters.converters import BaseFilterConverter
-from dev_utils.sqlalchemy.guards import is_queryable_attribute
-from dev_utils.sqlalchemy.utils import apply_joins, get_sqlalchemy_attribute
+from dev_utils.common import get_utc_now
 from sqlalchemy import (
     CursorResult,
     and_,
@@ -21,9 +20,10 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy import exc as sqlalchemy_exc
+from sqlalchemy_dev_utils import apply_joins, get_sqlalchemy_attribute, is_queryable_attribute
+from sqlalchemy_filter_converter import BaseFilterConverter
 
 from sqlrepo.exc import QueryError
-from sqlrepo.logging import logger as default_logger
 
 
 class JoinKwargs(TypedDict):
@@ -35,18 +35,21 @@ class JoinKwargs(TypedDict):
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from logging import Logger
 
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase as Base
     from sqlalchemy.orm import QueryableAttribute
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from sqlalchemy.orm.session import Session
-    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore
-    from sqlalchemy.sql._typing import _ColumnExpressionOrStrLabelArgument  # type: ignore
+    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
+    from sqlalchemy.sql._typing import (
+        _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
+    )
     from sqlalchemy.sql.dml import Delete, ReturningInsert, ReturningUpdate, Update
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
+
+    from sqlrepo.types import LogFunctionProtocol
 
     BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
     T = TypeVar("T")
@@ -77,11 +80,11 @@ class BaseQuery:
         self,
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        logger: "Logger" = default_logger,
+        log_function: "LogFunctionProtocol" = functools.partial(warnings.warn, stacklevel=2),
     ) -> None:
         self.specific_column_mapping = specific_column_mapping
         self.filter_converter_class = filter_converter_class
-        self.logger = logger
+        self.log_function = log_function
 
     def _resolve_specific_columns(
         self,
@@ -94,13 +97,17 @@ class BaseQuery:
         for idx, ele in enumerate(elements):
             if is_queryable_attribute(ele):
                 new_elements.append(ele)
-            elif isinstance(ele, str) and ele in (self.specific_column_mapping or set()):
-                new_elements.append(self.specific_column_mapping[ele])  # type: ignore
+            elif (
+                isinstance(ele, str)
+                and self.specific_column_mapping is not None
+                and ele in self.specific_column_mapping
+            ):
+                new_elements.append(self.specific_column_mapping[ele])
             elif isinstance(ele, str):
                 func = None
                 if ele.startswith('-'):
                     func = desc
-                    ele = ele[1:]
+                    ele = ele[1:]  # noqa: PLW2901
                 attr = get_sqlalchemy_attribute(model, ele)
                 if func is not None:
                     attr = func(attr)
@@ -117,7 +124,7 @@ class BaseQuery:
         joins: "Sequence[Join]",
     ) -> "Select[tuple[T]]":
         """Resolve joins from strings."""
-        # FIXME: may cause situation, when user passed Join as tuple may cause error.
+        # FIX: may cause situation, when user passed Join as tuple may cause error.
         # (Model, Model.id == OtherModel.model_id)  # noqa: ERA001
         # or
         # (Model, Model.id == OtherModel.model_id, {"isouter": True})  # noqa: ERA001
@@ -134,7 +141,7 @@ class BaseQuery:
                 stmt = stmt.join(join)
         return stmt
 
-    def _make_disable_filters(  # noqa: C901
+    def _make_disable_filters(
         self,
         *,
         model: "type[BaseSQLAlchemyModel]",
@@ -146,9 +153,9 @@ class BaseQuery:
         extra_filters: "Filter | None" = None,
     ) -> list["ColumnElement[bool]"]:
         """Generate disable filters from given data."""
-        filters: list["ColumnElement[bool]"] = list()
+        filters: list["ColumnElement[bool]"] = []
         filters.append(id_field.in_(ids_to_disable))
-        if allow_filter_by_value and field_type == bool:
+        if allow_filter_by_value and field_type is bool:
             filters.append(disable_field.is_not(True))
         elif allow_filter_by_value and field_type == datetime.datetime:
             filters.append(disable_field.is_(None))
@@ -257,8 +264,7 @@ class BaseQuery:
         """Generate SQLAlchemy stmt to insert data."""
         stmt = insert(model)
         stmt = stmt.values() if data is None else stmt.values(data)
-        stmt = stmt.returning(model)
-        return stmt
+        return stmt.returning(model)
 
     def _prepare_create_items(
         self,
@@ -272,10 +278,7 @@ class BaseQuery:
         """
         if isinstance(data, dict) or data is None:
             data = [data]
-        items: list["BaseSQLAlchemyModel"] = []
-        for data_ele in data:
-            items.append(model() if data_ele is None else model(**data_ele))
-        return items
+        return [model() if data_ele is None else model(**data_ele) for data_ele in data]
 
     def _db_update_stmt(
         self,
@@ -289,8 +292,7 @@ class BaseQuery:
         if filters is not None:
             sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
-        stmt = stmt.values(**data).returning(model)
-        return stmt
+        return stmt.values(**data).returning(model)
 
     def _db_delete_stmt(
         self,
@@ -317,20 +319,10 @@ class BaseQuery:
         extra_filters: "Filter | None" = None,
     ) -> "Update":
         """Generate SQLAlchemy stmt to disable items with given data."""
-        if issubclass(field_type, bool):
-            field_value = True
-        elif issubclass(field_type, datetime.datetime):  # type: ignore
-            field_value = get_utc_now()
-        else:
-            msg = (
-                'Parameter "field_type" should be one of the following: bool, datetime. '
-                f"{field_type} was passed."
-            )
-            self.logger.error(msg)
-            raise QueryError(msg)
+        field_value = True if field_type is bool else get_utc_now()
         if len(ids_to_disable) == 0:
             msg = 'Parameter "ids_to_disable" should contains at least one element.'
-            self.logger.error(msg)
+            self.log_function(msg)
             raise QueryError(msg)
         filters = self._make_disable_filters(
             model=model,
@@ -341,8 +333,7 @@ class BaseQuery:
             allow_filter_by_value=allow_filter_by_value,
             extra_filters=extra_filters,
         )
-        stmt = update(model).where(*filters).values({disable_field: field_value})
-        return stmt
+        return update(model).where(*filters).values({disable_field: field_value})
 
 
 class BaseSyncQuery(BaseQuery):
@@ -353,10 +344,14 @@ class BaseSyncQuery(BaseQuery):
         session: "Session",
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        logger: "Logger" = default_logger,
+        log_function: "LogFunctionProtocol" = functools.partial(warnings.warn, stacklevel=2),
     ) -> None:
         self.session = session
-        super().__init__(filter_converter_class, specific_column_mapping, logger)
+        super().__init__(
+            filter_converter_class=filter_converter_class,
+            specific_column_mapping=specific_column_mapping,
+            log_function=log_function,
+        )
 
     def get_item(
         self,
@@ -504,7 +499,7 @@ class BaseSyncQuery(BaseQuery):
             f"Create row in database. Item: {items}. "
             f"{'Flush used.' if use_flush else 'Commit used.'}."
         )
-        self.logger.debug(msg)
+        self.log_function(msg)
         if len(items) == 1:
             return items[0]
         return items
@@ -561,10 +556,10 @@ class BaseSyncQuery(BaseQuery):
         else:
             self.session.commit()
         msg = (
-            f"Update database row success. Item: {repr(item)}. Params: {data}, "
+            f"Update database row success. Item: {item!r}. Params: {data}, "
             f"set_none: {set_none}, use_flush: {use_flush}."
         )
-        self.logger.debug(msg)
+        self.log_function(msg)
         return is_updated, item
 
     def db_delete(
@@ -584,7 +579,10 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
+        if isinstance(  # pragma: no coverage  # type: ignore[reportUnnecessaryIsInstance]
+            result,
+            CursorResult,
+        ):
             return result.rowcount
         return 0  # pragma: no coverage
 
@@ -604,11 +602,11 @@ class BaseSyncQuery(BaseQuery):
                 self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             self.session.rollback()
-            msg = f"Error delete db_item: {exc}"  # noqa: S608
-            self.logger.warning(msg)
+            msg = f"Error delete db_item: {exc}"
+            self.log_function(msg)
             return False
-        msg = f"Success delete db_item. Item: {item_repr}"  # noqa: S608
-        self.logger.debug(msg)
+        msg = f"Success delete db_item. Item: {item_repr}"
+        self.log_function(msg)
         return True
 
     def disable_items(
@@ -648,7 +646,10 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
+        if isinstance(  # pragma: no coverage  # type: ignore[reportUnnecessaryIsInstance]
+            result,
+            CursorResult,
+        ):
             return result.rowcount
         return 0  # pragma: no coverage
 
@@ -661,10 +662,14 @@ class BaseAsyncQuery(BaseQuery):
         session: "AsyncSession",
         filter_converter_class: type[BaseFilterConverter],
         specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
-        logger: "Logger" = default_logger,
+        log_function: "LogFunctionProtocol" = functools.partial(warnings.warn, stacklevel=2),
     ) -> None:
         self.session = session
-        super().__init__(filter_converter_class, specific_column_mapping, logger)
+        super().__init__(
+            filter_converter_class=filter_converter_class,
+            specific_column_mapping=specific_column_mapping,
+            log_function=log_function,
+        )
 
     async def get_item(
         self,
@@ -812,7 +817,7 @@ class BaseAsyncQuery(BaseQuery):
             f"Create row in database. Items: {items}. "
             f"{'Flush used.' if use_flush else 'Commit used.'}."
         )
-        self.logger.debug(msg)
+        self.log_function(msg)
         if len(items) == 1:
             return items[0]
         return items
@@ -869,10 +874,10 @@ class BaseAsyncQuery(BaseQuery):
         else:
             await self.session.commit()
         msg = (
-            f"Update database row success. Item: {repr(item)}. Params: {data}, "
+            f"Update database row success. Item: {item!r}. Params: {data}, "
             f"set_none: {set_none}, use_flush: {use_flush}."
         )
-        self.logger.debug(msg)
+        self.log_function(msg)
         return is_updated, item
 
     async def db_delete(
@@ -892,7 +897,10 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
+        if isinstance(  # pragma: no coverage  # type: ignore[reportUnnecessaryIsInstance]
+            result,
+            CursorResult,
+        ):
             return result.rowcount
         return 0  # pragma: no coverage
 
@@ -912,11 +920,11 @@ class BaseAsyncQuery(BaseQuery):
                 await self.session.commit()
         except sqlalchemy_exc.SQLAlchemyError as exc:
             await self.session.rollback()
-            msg = f"Error delete db_item: {exc}"  # noqa: S608
-            self.logger.warning(msg)
+            msg = f"Error delete db_item: {exc}"
+            self.log_function(msg)
             return False
-        msg = f"Success delete db_item. Item: {item_repr}"  # noqa: S608
-        self.logger.debug(msg)
+        msg = f"Success delete db_item. Item: {item_repr}"
+        self.log_function(msg)
         return True
 
     async def disable_items(
@@ -956,6 +964,9 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        if isinstance(result, CursorResult):  # type: ignore  # pragma: no coverage
+        if isinstance(  # pragma: no coverage  # type: ignore[reportUnnecessaryIsInstance]
+            result,
+            CursorResult,
+        ):
             return result.rowcount
         return 0  # pragma: no coverage
