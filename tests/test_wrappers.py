@@ -1,25 +1,17 @@
 import pytest
-from dev_utils.core.exc import (
-    BaseDevError,
-    NoDeclarativeModelError,
-    NoModelAttributeError,
-    NoModelRelationshipError,
-    ProfilingError,
-)
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy_dev_utils.exc import BaseSQLAlchemyDevError
+from sqlalchemy_filter_converter.exc import FilterError
 
-from sqlrepo.exc import BaseSQLRepoError, QueryError, RepositoryError
+from sqlrepo.exc import BaseSQLRepoError, QueryError
 from sqlrepo.wrappers import wrap_any_exception_manager
 
 
 @pytest.mark.parametrize(
     ("wrap_error", "output_error"),
     [
-        (BaseDevError, RepositoryError),
-        (NoDeclarativeModelError, RepositoryError),
-        (NoModelAttributeError, RepositoryError),
-        (NoModelRelationshipError, RepositoryError),
-        (ProfilingError, RepositoryError),
+        (FilterError, QueryError),
+        (BaseSQLAlchemyDevError, QueryError),
         (SQLAlchemyError, QueryError),
         (AttributeError, BaseSQLRepoError),
         (TypeError, BaseSQLRepoError),

@@ -2,13 +2,13 @@ import datetime
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias
 
-from dev_utils.sqlalchemy.filters.converters import (
+from sqlalchemy_filter_converter import (
     AdvancedOperatorFilterConverter,
     BaseFilterConverter,
     DjangoLikeFilterConverter,
     SimpleFilterConverter,
 )
-from dev_utils.sqlalchemy.filters.types import FilterConverterStrategiesLiteral
+from sqlalchemy_filter_converter.types import FilterConverterStrategiesLiteral
 
 StrField: TypeAlias = str
 
@@ -29,7 +29,7 @@ filter_convert_classes: Final[dict[FilterConverterStrategiesLiteral, type[BaseFi
 class RepositoryConfig:
     """Repository config as dataclass."""
 
-    # TODO: add specific_column_mapping to filters, joins and loads.
+    # TODO: add specific_column_mapping to filters, joins and loads.  # noqa: FIX002, TD002, TD003
     specific_column_mapping: "dict[str, InstrumentedAttribute[Any]]" = field(default_factory=dict)
     """
     Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.

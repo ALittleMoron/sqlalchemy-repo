@@ -5,10 +5,10 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
 
-T = TypeVar("T", covariant=True)
+T_co = TypeVar("T_co", covariant=True)
 
 
-class SyncFactoryFunctionProtocol(Protocol[T]):
+class SyncFactoryFunctionProtocol(Protocol[T_co]):
     """Protocol for Sync functions-factories that create db items."""
 
     @staticmethod
@@ -17,10 +17,10 @@ class SyncFactoryFunctionProtocol(Protocol[T]):
         *,
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
-    ) -> T: ...
+    ) -> T_co: ...
 
 
-class AsyncFactoryFunctionProtocol(Protocol[T]):
+class AsyncFactoryFunctionProtocol(Protocol[T_co]):
     """Protocol for Sync functions-factories that create db items."""
 
     @staticmethod
@@ -29,4 +29,4 @@ class AsyncFactoryFunctionProtocol(Protocol[T]):
         *,
         commit: bool = False,
         **kwargs: Any,  # noqa: ANN401
-    ) -> T: ...
+    ) -> T_co: ...

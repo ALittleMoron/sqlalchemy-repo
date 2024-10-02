@@ -3,11 +3,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from dev_utils.core.exc import NoModelAttributeError
-from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter  # type: ignore
 from freezegun import freeze_time
 from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy_dev_utils.exc import NoModelAttributeError
+from sqlalchemy_filter_converter import SimpleFilterConverter
 
 from sqlrepo.exc import QueryError
 from sqlrepo.queries import BaseQuery
@@ -40,7 +40,7 @@ def test_resolve_specific_columns(  # noqa
     expected_result: list[str | ColumnElement[Any]],  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter, specific_column_mapping)
-    converted_columns = query._resolve_specific_columns(model=model, elements=elements)  # type: ignore
+    converted_columns = query._resolve_specific_columns(model=model, elements=elements)
     assert converted_columns == expected_result
 
 
@@ -75,7 +75,7 @@ def test_resolve_specific_columns_error(  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter, None)
     with pytest.raises(exception, match=match):
-        query._resolve_specific_columns(model=model, elements=elements)  # type: ignore
+        query._resolve_specific_columns(model=model, elements=elements)
 
 
 @pytest.mark.parametrize(
@@ -119,7 +119,7 @@ def test_resolve_and_apply_joins(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    new_stmt = query._resolve_and_apply_joins(stmt=stmt, joins=joins)  # type: ignore
+    new_stmt = query._resolve_and_apply_joins(stmt=stmt, joins=joins)
     assert str(new_stmt) == str(expected_result)
 
 
@@ -182,7 +182,7 @@ def test_make_disable_filters(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    disable_filters = query._make_disable_filters(  # type: ignore
+    disable_filters = query._make_disable_filters(
         model=MyModel,
         id_field=id_field,
         ids_to_disable=ids_to_disable,
@@ -224,7 +224,7 @@ def test_make_search_filter(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    search_filter = query._make_search_filter(  # type: ignore
+    search_filter = query._make_search_filter(
         search,
         MyModel,
         *search_by_args,
@@ -269,7 +269,7 @@ def test_get_item_stmt(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    get_item_stmt = query._get_item_stmt(  # type: ignore
+    get_item_stmt = query._get_item_stmt(
         model=MyModel,
         filters=filters,
         joins=joins,
@@ -312,7 +312,7 @@ def test_get_items_count_stmt(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    get_items_count_stmt = query._get_items_count_stmt(  # type: ignore
+    get_items_count_stmt = query._get_items_count_stmt(
         model=MyModel,
         joins=joins,
         filters=filters,
@@ -479,7 +479,7 @@ def test_get_item_list_stmt(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    get_item_list_stmt = query._get_item_list_stmt(  # type: ignore
+    get_item_list_stmt = query._get_item_list_stmt(
         model=MyModel,
         joins=joins,
         loads=loads,
@@ -503,7 +503,7 @@ def test_get_item_list_stmt(  # noqa
 )
 def test_db_insert_stmt(data: Any, expected_result: Any) -> None:  # noqa: ANN401
     query = BaseQuery(SimpleFilterConverter)
-    db_insert_stmt = query._db_insert_stmt(model=MyModel, data=data)  # type: ignore
+    db_insert_stmt = query._db_insert_stmt(model=MyModel, data=data)
     assert str(db_insert_stmt) == str(expected_result)
 
 
@@ -518,7 +518,7 @@ def test_db_insert_stmt(data: Any, expected_result: Any) -> None:  # noqa: ANN40
 )
 def test_prepare_create_items(data: Any, expected_result: Any) -> None:  # noqa: ANN401
     query = BaseQuery(SimpleFilterConverter)
-    prepared_values = query._prepare_create_items(model=MyModel, data=data)  # type: ignore
+    prepared_values = query._prepare_create_items(model=MyModel, data=data)
     assert len(prepared_values) == len(expected_result)
     for prepared, expected in zip(prepared_values, prepared_values, strict=True):
         assert prepared.__dict__ == expected.__dict__
@@ -549,7 +549,7 @@ def test_db_update_stmt(  # noqa
     expected_result: Any,  # noqa
 ) -> None:
     query = BaseQuery(SimpleFilterConverter)
-    db_update_stmt = query._db_update_stmt(  # type: ignore
+    db_update_stmt = query._db_update_stmt(
         model=MyModel,
         data=data,
         filters=filters,
@@ -566,7 +566,7 @@ def test_db_update_stmt(  # noqa
 )
 def test_db_delete_stmt(filters: Any, expected_result: Any):  # noqa
     query = BaseQuery(SimpleFilterConverter)
-    db_delete_stmt = query._db_delete_stmt(  # type: ignore
+    db_delete_stmt = query._db_delete_stmt(
         model=MyModel,
         filters=filters,
     )
@@ -626,7 +626,7 @@ def test_disable_items_stmt(  # noqa
     expected_result: Any,  # noqa
 ) -> None:  # noqa
     query = BaseQuery(SimpleFilterConverter)
-    disable_items_stmt = query._disable_items_stmt(  # type: ignore
+    disable_items_stmt = query._disable_items_stmt(
         model=MyModel,
         ids_to_disable=ids_to_disable,
         id_field=id_field,
@@ -641,12 +641,12 @@ def test_disable_items_stmt(  # noqa
 def test_disable_items_stmt_type_error():  # noqa
     query = BaseQuery(SimpleFilterConverter)
     with pytest.raises(QueryError):
-        query._disable_items_stmt(  # type: ignore
+        query._disable_items_stmt(
             model=MyModel,
             ids_to_disable={1, 2, 3},
             id_field=MyModel.id,
             disable_field=MyModel.bl,
-            field_type=str,  # type: ignore
+            field_type=str,
             allow_filter_by_value=True,
             extra_filters=None,
         )
@@ -658,9 +658,9 @@ def test_disable_items_stmt_value_error():  # noqa
         QueryError,
         match='Parameter "ids_to_disable" should contains at least one element.',
     ):
-        query._disable_items_stmt(  # type: ignore
+        query._disable_items_stmt(
             model=MyModel,
-            ids_to_disable=set(),  # type: ignore
+            ids_to_disable=set(),
             id_field=MyModel.id,
             disable_field=MyModel.bl,
             field_type=bool,

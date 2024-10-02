@@ -28,9 +28,11 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
 * [ ] Add more use-cases of `specific_column_mapping` option. Now it only works with
       `search_by` and `order_by` params. I want to add it for filters, joins and other
       parts, where it can be used.
-* [ ] Integrate sqlrepo with FastAPI or some other web-frameworks.
-* [ ] Add pydantic-like configuration. Current implementation works on ClassVar. I want to separate
+* [x] Integrate sqlrepo with FastAPI or some other web-frameworks.
+      NOTE: added since 1.5.0. Continued until 2.0.0. I currently not aimed to work on FastAPI.
+* [x] Add pydantic-like configuration. Current implementation works on ClassVar. I want to separate
       configuration and main repository code.
+      NOTE: added since 3.0.0
 
 If all these todo items are finished, it means, that all, what I want, is implemented.
 If you want to give me advice or feedback, you are welcome.
@@ -62,7 +64,7 @@ or other dependency managers.
 ## Usage
 
 sqlrepo provides base classes with CRUD operations, so you just need to inherit them with your
-SQLAlchemy model like this:
+SQLAlchemy model and implement needed methods like this:
 
 ```python
 from sqlrepo import BaseSyncRepository, BaseAsyncRepository
@@ -70,11 +72,13 @@ from sqlrepo import BaseSyncRepository, BaseAsyncRepository
 from your_package.models import YourModel
 
 class YourModelSyncRepository(BaseSyncRepository[YourModel]):
-    pass
+    def get(self, your_model_id: int) -> YourModel:
+          return self._get(filters={"your_model_id": your_model_id})
 
 class YourModelAsyncRepository(BaseAsyncRepository[YourModel]):
     pass
 ```
+
 
 ## Configuration
 
@@ -106,7 +110,7 @@ Use case:
 from my_package.models import Admin
 
 class AdminRepository(BaseSyncRepository[Admin]):
-    pass
+    ...
 
 # So, when you will use AdminRepository, model_class attribute will be set with Admin
 # automatically.
@@ -144,6 +148,9 @@ class AdminRepository(BaseSyncRepository[Admin]):
             "other_field": Admin.name,
         }
     )
+    
+    def list(self, filters: "dict[str, Any] | None" = None):
+          return self._list(filters=filters)
 
 
 admins = AdminRepository(session).list(
@@ -252,67 +259,6 @@ List of operators: `=, >, <, >=, <=, is, is_not, between, contains`.
 
 * `django-like` - `key-value` dict with django-like lookups system. See django docs for
 more info.
-
-## Unit of work
-
-sqlrepo provides unit of work base implementation to work with all your repositories in one place
-with one session:
-
-```python
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
-from sqlrepo import BaseAsyncRepository, BaseAsyncUnitOfWork
-
-from your_package.models import YourModel, YourOtherModel
-
-async_engine = create_async_engine(...)
-async_session = async_sessionmaker(async_engine)
-
-
-class YourModelAsyncRepository(BaseAsyncRepository[YourModel]):
-    pass
-
-class YourOtherModelAsyncRepository(BaseSyncRepository[YourOtherModel]):
-    pass
-
-
-class YourUnitOfWork(BaseAsyncUnitOfWork):
-    session_factory = async_session
-
-    async def init_repositories(self, session: AsyncSession) -> None:
-        self.your_model_repo = YourModelAsyncRepository(session)
-        self.your_other_model_repo = YourOtherModelAsyncRepository(session)
-
-    # Your custom method, that works with your repositories and do business-logic.
-    async def work_with_repo_together(self, model_id: int):
-        your_model_instance = await self.your_model_repo.get(filters={'id': model_id})
-        your_other_model_instance = await self.your_model_repo.list(
-            filters={'your_model_id': model_id},
-        )
-        # Some other stuff
-```
-
-Be careful, when you work with Unit of work pattern. For stable work use `expire_on_commit = False`
-in your sessionmaker or make sure, that your repositories has option `use_flush = True` to avoid
-problems with `session.commit`.
-
-Be sure, you passed `session_factory` in class body, otherwise it will
-cause TypeError. `session_factory` is abstract class property. It must
-be set or Unit of work will not work.
-
-By default Unit of work will make commit on context manager exit, but you can specify
-`__skip_session_use__ = True` for your Unit of work class like this:
-
-```python
-...
-
-class YourUnitOfWork(BaseAsyncUnitOfWork):
-    __skip_session_use__ = True
-
-...
-```
-
-and this will cause no commit or other session manipulation (except session create for repositories
-work).
 
 ## Extensions
 

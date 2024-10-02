@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import Depends, Request
 
-from sqlrepo.ext.fastapi.stubs import _get_session_stub  # type: ignore
+from sqlrepo.ext.fastapi.stubs import _get_session_stub  # type: ignore[reportPrivateUsage]
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

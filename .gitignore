@@ -8,3 +8,5 @@ __pycache__
 project.todo
 .pdm-python
 dist
+.zed
+.idea

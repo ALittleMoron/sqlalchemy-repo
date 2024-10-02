@@ -2,6 +2,7 @@
 
 import importlib
 import warnings
+from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -19,20 +20,23 @@ from sqlalchemy.orm import DeclarativeBase as Base
 
 from sqlrepo import exc as sqlrepo_exc
 from sqlrepo.config import RepositoryConfig
-from sqlrepo.logging import logger as default_logger
+from sqlrepo.logger import default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
 from sqlrepo.wrappers import wrap_any_exception_manager
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-    from logging import Logger
 
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.attributes import QueryableAttribute
     from sqlalchemy.orm.session import Session
-    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore
-    from sqlalchemy.sql._typing import _ColumnExpressionOrStrLabelArgument  # type: ignore
+    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
+    from sqlalchemy.sql._typing import (
+        _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
+    )
     from sqlalchemy.sql.elements import ColumnElement
+
+    from sqlrepo.types import Filter, LoggerProtocol
 
     class JoinKwargs(TypedDict):
         """Kwargs for join."""
@@ -47,7 +51,6 @@ if TYPE_CHECKING:
     ModelWithOnclause = tuple[Model, JoinClause]
     CompleteModel = tuple[Model, JoinClause, JoinKwargs]
     Join = str | Model | ModelWithOnclause | CompleteModel
-    Filter = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]
     Load = _AbstractLoad
     SearchParam = str | QueryableAttribute[Any]
     OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
@@ -134,11 +137,11 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             # PEP-560: https://peps.python.org/pep-0560/
             # NOTE: this code is needed for getting type from generic: Generic[int] -> int type
             # get_args get params from __orig_bases__, that contains Generic passed types.
-            model, *_ = get_args(cls.__orig_bases__[0])  # type: ignore
-        except Exception as exc:  # pragma: no coverage
+            model, *_ = get_args(cls.__orig_bases__[0])  # type: ignore[reportAttributeAccessIssue]
+        except (AttributeError, IndexError, TypeError) as exc:
             msg = (
                 f"Error during getting information about Generic types for {cls.__name__}. "
-                f"Original exception: {str(exc)}"
+                f"Original exception: {exc!s}"
             )
             warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
@@ -153,11 +156,11 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
                     raise TypeError(msg)  # noqa: TRY301
                 model_globals = vars(importlib.import_module(repo_module))
                 model = eval(model.__forward_arg__, model_globals)  # noqa: S307
-            except Exception as exc:
+            except (ImportError, TypeError, AttributeError, NameError) as exc:
                 msg = (
                     "Can't evaluate ForwardRef of generic type. "
                     "Don't use type in generic with quotes. "
-                    f"Original exception: {str(exc)}"
+                    f"Original exception: {exc!s}"
                 )
                 warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
                 return
@@ -165,11 +168,15 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             msg = "GenericType was not passed for SQLAlchemy model declarative class."
             warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
+        if not isclass(model):
+            msg = "Passed GenericType is not a class."
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
+            return
         if not issubclass(model, Base):
             msg = "Passed GenericType is not SQLAlchemy model declarative class."
             warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
-        cls.model_class = model  # type: ignore
+        cls.model_class = model  # type: ignore[reportAttributeAccessIssue]
 
 
 class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
@@ -185,18 +192,18 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def __init__(
         self,
         session: "AsyncSession",
-        logger: "Logger" = default_logger,
+        logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session
         self.logger = logger
         self.queries = self.query_class(
-            session,
-            self.config.get_filter_convert_class(),
-            self.config.specific_column_mapping,
-            logger,
+            session=session,
+            filter_converter_class=self.config.get_filter_convert_class(),
+            specific_column_mapping=self.config.specific_column_mapping,
+            logger=logger,
         )
 
-    async def get(
+    async def _get(
         self,
         filters: "Filter",
         *,
@@ -205,15 +212,14 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         with wrap_any_exception_manager():
-            result = await self.queries.get_item(
+            return await self.queries.get_item(
                 model=self.model_class,
                 joins=joins,
                 loads=loads,
                 filters=filters,
             )
-        return result
 
-    async def count(
+    async def _count(
         self,
         *,
         filters: "Filter | None" = None,
@@ -221,14 +227,13 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> int:
         """Get count of instances of model_class by given filters."""
         with wrap_any_exception_manager():
-            result = await self.queries.get_items_count(
+            return await self.queries.get_items_count(
                 model=self.model_class,
                 joins=joins,
                 filters=filters,
             )
-        return result
 
-    async def list(  # noqa: A003
+    async def _list(
         self,
         *,
         filters: "Filter | None" = None,
@@ -242,7 +247,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         with wrap_any_exception_manager():
-            result = await self.queries.get_item_list(
+            return await self.queries.get_item_list(
                 model=self.model_class,
                 joins=joins,
                 loads=loads,
@@ -254,36 +259,34 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 offset=offset,
                 unique_items=self.config.unique_list_items,
             )
-        return result
 
     @overload
-    async def create(
+    async def _create(
         self,
         *,
         data: "DataDict | None",
     ) -> "BaseSQLAlchemyModel": ...
 
     @overload
-    async def create(
+    async def _create(
         self,
         *,
         data: "Sequence[DataDict]",
     ) -> "Sequence[BaseSQLAlchemyModel]": ...
 
-    async def create(
+    async def _create(
         self,
         *,
         data: "DataDict | Sequence[DataDict] | None",
     ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model_class instance from given data."""
         with wrap_any_exception_manager():
-            result = await self.queries.db_create(
+            return await self.queries.db_create(
                 model=self.model_class,
                 data=data,
             )
-        return result
 
-    async def update(
+    async def _update(
         self,
         *,
         data: "DataDict",
@@ -291,15 +294,14 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
-            result = await self.queries.db_update(
+            return await self.queries.db_update(
                 model=self.model_class,
                 data=data,
                 filters=filters,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    async def update_instance(
+    async def _update_instance(
         self,
         *,
         instance: "BaseSQLAlchemyModel",
@@ -310,30 +312,28 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         Returns tuple with boolean (was instance updated or not) and updated instance.
         """
         with wrap_any_exception_manager():
-            result = await self.queries.change_item(
+            return await self.queries.change_item(
                 data=data,
                 item=instance,
                 set_none=self.config.update_set_none,
                 allowed_none_fields=self.config.update_allowed_none_fields,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    async def delete(
+    async def _delete(
         self,
         *,
         filters: "Filter | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         with wrap_any_exception_manager():
-            result = await self.queries.db_delete(
+            return await self.queries.db_delete(
                 model=self.model_class,
                 filters=filters,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    async def disable(
+    async def _disable(
         self,
         *,
         ids_to_disable: set[Any],
@@ -342,17 +342,16 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         """Disable model_class instances with given ids and extra_filters."""
         with wrap_any_exception_manager():
             self._validate_disable_attributes()
-            result = await self.queries.disable_items(
+            return await self.queries.disable_items(
                 model=self.model_class,
                 ids_to_disable=ids_to_disable,
-                id_field=self.config.disable_id_field,  # type: ignore
-                disable_field=self.config.disable_field,  # type: ignore
-                field_type=self.config.disable_field_type,  # type: ignore
+                id_field=self.config.disable_id_field,  # type: ignore[reportArgumentType]
+                disable_field=self.config.disable_field,  # type: ignore[reportArgumentType]
+                field_type=self.config.disable_field_type,  # type: ignore[reportArgumentType]
                 allow_filter_by_value=self.config.allow_disable_filter_by_value,
                 extra_filters=extra_filters,
                 use_flush=self.config.use_flush,
             )
-        return result
 
 
 class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
@@ -365,20 +364,17 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     __inheritance_check_model_class__ = False
     query_class: type["BaseSyncQuery"] = BaseSyncQuery
 
-    def __init__(
-        self,
-        session: "Session",
-        logger: "Logger" = default_logger,
-    ) -> None:
+    def __init__(self, session: "Session", logger: "LoggerProtocol" = default_logger) -> None:
         self.session = session
+        self.logger = logger
         self.queries = self.query_class(
-            session,
-            self.config.get_filter_convert_class(),
-            self.config.specific_column_mapping,
-            logger,
+            session=session,
+            filter_converter_class=self.config.get_filter_convert_class(),
+            specific_column_mapping=self.config.specific_column_mapping,
+            logger=logger,
         )
 
-    def get(
+    def _get(
         self,
         *,
         filters: "Filter",
@@ -387,15 +383,14 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         with wrap_any_exception_manager():
-            result = self.queries.get_item(
+            return self.queries.get_item(
                 model=self.model_class,
                 joins=joins,
                 loads=loads,
                 filters=filters,
             )
-        return result
 
-    def count(
+    def _count(
         self,
         *,
         filters: "Filter | None" = None,
@@ -403,14 +398,13 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> int:
         """Get count of instances of model_class by given filters."""
         with wrap_any_exception_manager():
-            result = self.queries.get_items_count(
+            return self.queries.get_items_count(
                 model=self.model_class,
                 joins=joins,
                 filters=filters,
             )
-        return result
 
-    def list(  # noqa: A003
+    def _list(
         self,
         *,
         joins: "Sequence[Join] | None" = None,
@@ -424,7 +418,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         with wrap_any_exception_manager():
-            result = self.queries.get_item_list(
+            return self.queries.get_item_list(
                 model=self.model_class,
                 joins=joins,
                 loads=loads,
@@ -436,36 +430,34 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 offset=offset,
                 unique_items=self.config.unique_list_items,
             )
-        return result
 
     @overload
-    def create(
+    def _create(
         self,
         *,
         data: "DataDict | None",
     ) -> "BaseSQLAlchemyModel": ...
 
     @overload
-    def create(
+    def _create(
         self,
         *,
         data: "Sequence[DataDict]",
     ) -> "Sequence[BaseSQLAlchemyModel]": ...
 
-    def create(
+    def _create(
         self,
         *,
         data: "DataDict | Sequence[DataDict] | None",
     ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
         """Create model_class instance from given data."""
         with wrap_any_exception_manager():
-            result = self.queries.db_create(
+            return self.queries.db_create(
                 model=self.model_class,
                 data=data,
             )
-        return result
 
-    def update(
+    def _update(
         self,
         *,
         data: "DataDict",
@@ -473,15 +465,14 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
-            result = self.queries.db_update(
+            return self.queries.db_update(
                 model=self.model_class,
                 data=data,
                 filters=filters,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    def update_instance(
+    def _update_instance(
         self,
         *,
         instance: "BaseSQLAlchemyModel",
@@ -492,30 +483,28 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         Returns tuple with boolean (was instance updated or not) and updated instance.
         """
         with wrap_any_exception_manager():
-            result = self.queries.change_item(
+            return self.queries.change_item(
                 data=data,
                 item=instance,
                 set_none=self.config.update_set_none,
                 allowed_none_fields=self.config.update_allowed_none_fields,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    def delete(
+    def _delete(
         self,
         *,
         filters: "Filter | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         with wrap_any_exception_manager():
-            result = self.queries.db_delete(
+            return self.queries.db_delete(
                 model=self.model_class,
                 filters=filters,
                 use_flush=self.config.use_flush,
             )
-        return result
 
-    def disable(
+    def _disable(
         self,
         *,
         ids_to_disable: set[Any],
@@ -524,14 +513,13 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         """Disable model_class instances with given ids and extra_filters."""
         with wrap_any_exception_manager():
             self._validate_disable_attributes()
-            result = self.queries.disable_items(
+            return self.queries.disable_items(
                 model=self.model_class,
                 ids_to_disable=ids_to_disable,
-                id_field=self.config.disable_id_field,  # type: ignore
-                disable_field=self.config.disable_field,  # type: ignore
-                field_type=self.config.disable_field_type,  # type: ignore
+                id_field=self.config.disable_id_field,  # type: ignore[reportArgumentType]
+                disable_field=self.config.disable_field,  # type: ignore[reportArgumentType]
+                field_type=self.config.disable_field_type,  # type: ignore[reportArgumentType]
                 allow_filter_by_value=self.config.allow_disable_filter_by_value,
                 extra_filters=extra_filters,
                 use_flush=self.config.use_flush,
             )
-        return result
