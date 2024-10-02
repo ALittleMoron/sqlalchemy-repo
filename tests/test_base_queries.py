@@ -3,11 +3,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from dev_utils.core.exc import NoModelAttributeError
-from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter
 from freezegun import freeze_time
 from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy_dev_utils.exc import NoModelAttributeError
+from sqlalchemy_filter_converter import SimpleFilterConverter
 
 from sqlrepo.exc import QueryError
 from sqlrepo.queries import BaseQuery

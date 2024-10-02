@@ -13,16 +13,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def wrap_any_exception_manager() -> "Generator[None, None, Any]":
-    """Context manager wrapper to prevent sqlalchemy or any other exceptions to be thrown.
-
-    replace with such pattern:
-
-        1) if there is SQLAlchemyError, throw QueryError, because its error in query executing.
-
-        2) if there is error from python-dev-utils (BaseDevError), throw RepositoryError.
-
-        3) if there is possible python errors (not all. Only specific), throw BaseSQLRepoError.
-    """
+    """Context manager wrapper to prevent sqlalchemy or any other exceptions to be thrown."""
     try:
         yield
     except BaseSQLAlchemyDevError as exc:

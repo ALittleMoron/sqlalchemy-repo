@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from dev_utils.sqlalchemy.filters.converters import SimpleFilterConverter
 from mimesis import Datetime, Locale, Text
 from sqlalchemy import func, select
+from sqlalchemy_filter_converter import SimpleFilterConverter
 
 from sqlrepo.queries import BaseAsyncQuery
 from tests.utils import (

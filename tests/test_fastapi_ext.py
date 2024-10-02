@@ -3,13 +3,13 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 import pytest
-from dev_utils.verbose_http_exceptions.exc import BaseVerboseHTTPException
-from dev_utils.verbose_http_exceptions.ext.fastapi import apply_verbose_http_exception_handler
 from fastapi import Depends, FastAPI, HTTPException, Path, status
 from fastapi.testclient import TestClient
 from mimesis import Datetime, Locale, Text
 from pydantic import BaseModel, ConfigDict, TypeAdapter
 from sqlalchemy.orm.session import Session
+from verbose_http_exceptions.exc import BaseVerboseHTTPException
+from verbose_http_exceptions.ext.fastapi import apply_verbose_http_exception_handler
 
 from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService, add_session_stub_overrides
 from sqlrepo.ext.fastapi.pagination import (
@@ -71,19 +71,19 @@ class MyModelService(BaseSyncService[MyModel, MyModelDetail, MyModelList]):  # n
         self.my_model_repo = MyModelRepository(session)
 
     def get_by_id(self, my_model_id: int) -> MyModelDetail:  # noqa: D102
-        entity = self.my_model_repo.get(filters={"id": my_model_id})
+        entity = self.my_model_repo._get(filters={"id": my_model_id})
         return self.resolve_entity(entity)
 
     def list(self) -> list[MyModelList]:  # noqa: D102
-        entities = self.my_model_repo.list()
+        entities = self.my_model_repo._list()
         return self.resolve_entity_list(entities)
 
     def list_paginated(  # noqa: D102
         self,
         pagination: AbstractBasePagination,
     ) -> PaginatedResult[MyModelList]:
-        entities = self.my_model_repo.list(limit=pagination.limit, offset=pagination.offset)
-        total_count = self.my_model_repo.count()
+        entities = self.my_model_repo._list(limit=pagination.limit, offset=pagination.offset)
+        total_count = self.my_model_repo._count()
         meta = PaginationMeta.create(
             all_records_count=total_count,
             pagination=pagination,

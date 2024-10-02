@@ -1,8 +1,8 @@
 """Main implementations for sqlrepo project."""
 
-import functools
 import importlib
 import warnings
+from inspect import isclass
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -20,6 +20,7 @@ from sqlalchemy.orm import DeclarativeBase as Base
 
 from sqlrepo import exc as sqlrepo_exc
 from sqlrepo.config import RepositoryConfig
+from sqlrepo.logger import default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
 from sqlrepo.wrappers import wrap_any_exception_manager
 
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     )
     from sqlalchemy.sql.elements import ColumnElement
 
-    from sqlrepo.types import LogFunctionProtocol
+    from sqlrepo.types import Filter, LoggerProtocol
 
     class JoinKwargs(TypedDict):
         """Kwargs for join."""
@@ -50,7 +51,6 @@ if TYPE_CHECKING:
     ModelWithOnclause = tuple[Model, JoinClause]
     CompleteModel = tuple[Model, JoinClause, JoinKwargs]
     Join = str | Model | ModelWithOnclause | CompleteModel
-    Filter = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]
     Load = _AbstractLoad
     SearchParam = str | QueryableAttribute[Any]
     OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
@@ -168,6 +168,10 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             msg = "GenericType was not passed for SQLAlchemy model declarative class."
             warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
             return
+        if not isclass(model):
+            msg = "Passed GenericType is not a class."
+            warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
+            return
         if not issubclass(model, Base):
             msg = "Passed GenericType is not SQLAlchemy model declarative class."
             warnings.warn(msg, RepositoryModelClassIncorrectUseWarning, stacklevel=2)
@@ -188,18 +192,18 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def __init__(
         self,
         session: "AsyncSession",
-        log_function: "LogFunctionProtocol" = functools.partial(warnings.warn, stacklevel=2),
+        logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session
-        self.log_function = log_function
+        self.logger = logger
         self.queries = self.query_class(
             session=session,
             filter_converter_class=self.config.get_filter_convert_class(),
             specific_column_mapping=self.config.specific_column_mapping,
-            log_function=log_function,
+            logger=logger,
         )
 
-    async def get(
+    async def _get(
         self,
         filters: "Filter",
         *,
@@ -215,7 +219,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 filters=filters,
             )
 
-    async def count(
+    async def _count(
         self,
         *,
         filters: "Filter | None" = None,
@@ -229,7 +233,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 filters=filters,
             )
 
-    async def list(
+    async def _list(
         self,
         *,
         filters: "Filter | None" = None,
@@ -257,20 +261,20 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             )
 
     @overload
-    async def create(
+    async def _create(
         self,
         *,
         data: "DataDict | None",
     ) -> "BaseSQLAlchemyModel": ...
 
     @overload
-    async def create(
+    async def _create(
         self,
         *,
         data: "Sequence[DataDict]",
     ) -> "Sequence[BaseSQLAlchemyModel]": ...
 
-    async def create(
+    async def _create(
         self,
         *,
         data: "DataDict | Sequence[DataDict] | None",
@@ -282,7 +286,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 data=data,
             )
 
-    async def update(
+    async def _update(
         self,
         *,
         data: "DataDict",
@@ -297,7 +301,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    async def update_instance(
+    async def _update_instance(
         self,
         *,
         instance: "BaseSQLAlchemyModel",
@@ -316,7 +320,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    async def delete(
+    async def _delete(
         self,
         *,
         filters: "Filter | None" = None,
@@ -329,7 +333,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    async def disable(
+    async def _disable(
         self,
         *,
         ids_to_disable: set[Any],
@@ -360,20 +364,17 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     __inheritance_check_model_class__ = False
     query_class: type["BaseSyncQuery"] = BaseSyncQuery
 
-    def __init__(
-        self,
-        session: "Session",
-        log_function: "LogFunctionProtocol" = functools.partial(warnings.warn, stacklevel=2),
-    ) -> None:
+    def __init__(self, session: "Session", logger: "LoggerProtocol" = default_logger) -> None:
         self.session = session
+        self.logger = logger
         self.queries = self.query_class(
             session=session,
             filter_converter_class=self.config.get_filter_convert_class(),
             specific_column_mapping=self.config.specific_column_mapping,
-            log_function=log_function,
+            logger=logger,
         )
 
-    def get(
+    def _get(
         self,
         *,
         filters: "Filter",
@@ -389,7 +390,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 filters=filters,
             )
 
-    def count(
+    def _count(
         self,
         *,
         filters: "Filter | None" = None,
@@ -403,7 +404,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 filters=filters,
             )
 
-    def list(
+    def _list(
         self,
         *,
         joins: "Sequence[Join] | None" = None,
@@ -431,20 +432,20 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             )
 
     @overload
-    def create(
+    def _create(
         self,
         *,
         data: "DataDict | None",
     ) -> "BaseSQLAlchemyModel": ...
 
     @overload
-    def create(
+    def _create(
         self,
         *,
         data: "Sequence[DataDict]",
     ) -> "Sequence[BaseSQLAlchemyModel]": ...
 
-    def create(
+    def _create(
         self,
         *,
         data: "DataDict | Sequence[DataDict] | None",
@@ -456,7 +457,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 data=data,
             )
 
-    def update(
+    def _update(
         self,
         *,
         data: "DataDict",
@@ -471,7 +472,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    def update_instance(
+    def _update_instance(
         self,
         *,
         instance: "BaseSQLAlchemyModel",
@@ -490,7 +491,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    def delete(
+    def _delete(
         self,
         *,
         filters: "Filter | None" = None,
@@ -503,7 +504,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 use_flush=self.config.use_flush,
             )
 
-    def disable(
+    def _disable(
         self,
         *,
         ids_to_disable: set[Any],

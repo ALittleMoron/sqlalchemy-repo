@@ -45,7 +45,7 @@ def event_loop() -> "Generator[asyncio.AbstractEventLoop, None, None]":
 @pytest.fixture(scope="session")
 def db_name() -> str:
     """Db name as fixture."""
-    return "test_db"
+    return "test_sqlrepo_db"
 
 
 @pytest.fixture(scope="session")

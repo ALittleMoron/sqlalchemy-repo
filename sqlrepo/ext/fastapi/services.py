@@ -25,7 +25,7 @@ VListSchema = TypeVar("VListSchema", bound=BaseModel)
 
 
 def resolve_type(
-    cls: type['BaseService[TModel, TDetailSchema, VListSchema]'],
+    cls: type["BaseService[TModel, TDetailSchema, VListSchema]"],
     value: Any,  # noqa: ANN401
 ) -> Any | None:  # noqa: ANN401
     """Resolve given generic type of BaseService to real type."""

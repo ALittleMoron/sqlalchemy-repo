@@ -56,7 +56,7 @@ async def test_get_item(  # noqa: D103
 ) -> None:
     item = await mymodel_async_factory(db_async_session, commit=True)
     repo = MyModelRepo(db_async_session)
-    db_item = await repo.get(filters=dict(id=item.id))
+    db_item = await repo._get(filters=dict(id=item.id))
     assert db_item is not None, f"MyModel with id {item.id} not found in db."
     assert_compare_db_items(item, db_item)
 
@@ -65,7 +65,7 @@ async def test_get_item(  # noqa: D103
 async def test_get_item_not_found(db_async_session: "AsyncSession") -> None:  # noqa: D103
     repo = MyModelRepo(db_async_session)
     incorrect_id = 1
-    db_item = await repo.get(filters=dict(id=incorrect_id))
+    db_item = await repo._get(filters=dict(id=incorrect_id))
     assert db_item is None, f"MyModel with id {incorrect_id} was found in db (but it shouldn't)."
 
 
@@ -79,7 +79,7 @@ async def test_get_items_count(  # noqa: D103
         await mymodel_async_factory(db_async_session, commit=False)
     await db_async_session.commit()
     repo = MyModelRepo(db_async_session)
-    count = await repo.count()
+    count = await repo._count()
     assert count == create_count
 
 
@@ -93,7 +93,7 @@ async def test_get_items_count_with_filter(  # noqa: D103
         await mymodel_async_factory(db_async_session, commit=False)
     await db_async_session.commit()
     repo = MyModelRepo(db_async_session)
-    count = await repo.count(filters=dict(id=item.id))
+    count = await repo._count(filters=dict(id=item.id))
     assert count == 1
 
 
@@ -105,7 +105,7 @@ async def test_get_items_list(  # noqa: D103
     items = [await mymodel_async_factory(db_async_session, commit=False) for _ in range(3)]
     await db_async_session.commit()
     repo = MyModelRepo(db_async_session)
-    db_items = list(await repo.list())
+    db_items = list(await repo._list())
     assert_compare_db_item_list(items, db_items)
 
 
@@ -140,7 +140,7 @@ async def test_db_create(
     db_async_session: "AsyncSession",
 ) -> None:
     repo = MyModelRepo(db_async_session)
-    db_item = await repo.create(data=create_data)
+    db_item = await repo._create(data=create_data)
     if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
@@ -177,7 +177,7 @@ async def test_create_item(
     create_data: dict[str, Any],
 ) -> None:
     repo = MyModelRepo(db_async_session)
-    db_item = await repo.create(data=create_data)
+    db_item = await repo._create(data=create_data)
     if not isinstance(db_item, MyModel):
         pytest.skip("No compare functions")
     assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
@@ -216,7 +216,7 @@ async def test_db_update(
     for _ in range(items_count):
         await mymodel_async_factory(db_async_session, commit=True)
     repo = MyModelRepo(db_async_session)
-    db_item = await repo.update(data=update_data)
+    db_item = await repo._update(data=update_data)
     if db_item is None:
         pytest.fail("In this case db_item can't be None. Bug.")
     assert len(db_item) == items_count
@@ -250,7 +250,7 @@ async def test_change_item(
 ) -> None:
     item = await mymodel_async_factory(db_async_session)
     repo = MyModelRepo(db_async_session)
-    updated, db_item = await repo.update_instance(instance=item, data=update_data)
+    updated, db_item = await repo._update_instance(instance=item, data=update_data)
     assert expected_updated_flag is updated
     assert_compare_db_item_with_dict(db_item, update_data, skip_keys_check=True)
 
@@ -302,7 +302,7 @@ async def test_change_item_none_check(
     repo = MyModelRepo(db_async_session)
     repo.config.update_set_none = set_none
     repo.config.update_allowed_none_fields = allowed_none_fields
-    updated, db_item = await repo.update_instance(instance=item, data=update_data)
+    updated, db_item = await repo._update_instance(instance=item, data=update_data)
     if expected_updated_flag is not updated:
         pytest.skip("update flag check failed. Test needs to be changed.")
     assert_compare_db_item_none_fields(db_item, none_set_fields)
@@ -315,7 +315,7 @@ async def test_db_delete_direct_value(
 ) -> None:
     item = await mymodel_async_factory(db_async_session)
     repo = MyModelRepo(db_async_session)
-    delete_count = await repo.delete(filters={"id": item.id})
+    delete_count = await repo._delete(filters={"id": item.id})
     assert delete_count == 1
     assert await db_async_session.scalar(select(func.count()).select_from(MyModel)) == 0
 
@@ -329,7 +329,7 @@ async def test_db_delete_multiple_values(
     for _ in range(to_delete_count):
         await mymodel_async_factory(db_async_session)
     repo = MyModelRepo(db_async_session)
-    delete_count = await repo.delete()
+    delete_count = await repo._delete()
     assert delete_count == to_delete_count
     assert await db_async_session.scalar(select(func.count()).select_from(MyModel)) == 0
 
@@ -342,7 +342,7 @@ async def test_disable_error(
     item = await mymodel_async_factory(db_async_session, bl=False)
     repo = EmptyMyModelRepo(db_async_session)
     with pytest.raises(RepositoryAttributeError):
-        await repo.disable(
+        await repo._disable(
             ids_to_disable={item.id},
             extra_filters={"id": item.id},
         )
@@ -355,7 +355,7 @@ async def test_disable_items_direct_value(
 ) -> None:
     item = await mymodel_async_factory(db_async_session, bl=False)
     repo = MyModelRepo(db_async_session)
-    disable_count = await repo.disable(
+    disable_count = await repo._disable(
         ids_to_disable={item.id},
         extra_filters={"id": item.id},
     )
@@ -375,7 +375,7 @@ async def test_disable_items_direct_value_with_instrumented_attributes(
 ) -> None:
     item = await mymodel_async_factory(db_async_session, bl=False)
     repo = MyModelRepoWithInstrumentedAttributes(db_async_session)
-    disable_count = await repo.disable(
+    disable_count = await repo._disable(
         ids_to_disable={item.id},
         extra_filters={"id": item.id},
     )

@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from dev_utils.sqlalchemy.filters.converters import (
+from sqlalchemy_filter_converter import (
     AdvancedOperatorFilterConverter,
     DjangoLikeFilterConverter,
     SimpleFilterConverter,
