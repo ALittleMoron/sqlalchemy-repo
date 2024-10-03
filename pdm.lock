@@ -5,7 +5,7 @@
 groups = ["default", "dev", "fastapi"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:4cf82386937bf4108dbe42ce028c74019b8636468617b509605219a794ab550f"
+content_hash = "sha256:29f8f9126eeabc2edb60e11ea0d718bd9568a9b113a5e7b3eee1d733964e290f"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -1034,7 +1034,7 @@ files = [
 
 [[package]]
 name = "sqlalchemy-dev-utils"
-version = "1.0.1"
+version = "1.1.0"
 requires_python = ">=3.11"
 summary = "My sqlalchemy utils package, that I use in my projects."
 groups = ["default"]
@@ -1043,24 +1043,24 @@ dependencies = [
     "sqlalchemy>=2.0",
 ]
 files = [
-    {file = "sqlalchemy_dev_utils-1.0.1-py3-none-any.whl", hash = "sha256:d5c8ebacd57d37efe31523cddaff1fece5a78773f41acb6ff1fe1b4b048119b2"},
-    {file = "sqlalchemy_dev_utils-1.0.1.tar.gz", hash = "sha256:019156f5ead9cd652c7f0be55766dde71fe04bbe51a21dd50f6d5193d75fc484"},
+    {file = "sqlalchemy_dev_utils-1.1.0-py3-none-any.whl", hash = "sha256:d2e01934ff6b51eeb8b6faa03fcfdbafba90afbac5c64d645677e514b02d59b5"},
+    {file = "sqlalchemy_dev_utils-1.1.0.tar.gz", hash = "sha256:09a4dfb9fd1001bc094b1a7dd7cb11cb6fbb94c6e3e01fa783a224caaade0276"},
 ]
 
 [[package]]
 name = "sqlalchemy-filter-converter"
-version = "1.3.0"
+version = "1.3.1"
 requires_python = ">=3.11"
 summary = "SQLAlchemy filter converters."
 groups = ["default"]
 dependencies = [
     "python-dev-utils==7.0.1",
-    "sqlalchemy-dev-utils==1.0.1",
+    "sqlalchemy-dev-utils==1.1.0",
     "sqlalchemy>=2.0",
 ]
 files = [
-    {file = "sqlalchemy_filter_converter-1.3.0-py3-none-any.whl", hash = "sha256:bc280a65482c22ed3f07f56e53d5e1d36719e09f5dd2532e68615d136a3da16e"},
-    {file = "sqlalchemy_filter_converter-1.3.0.tar.gz", hash = "sha256:13d12a6589de95cf674fb9731618af2a6723f7831706f4fc872b8bfccf9374ef"},
+    {file = "sqlalchemy_filter_converter-1.3.1-py3-none-any.whl", hash = "sha256:da942d0b0203b007257d9036187994cccda72d99deff2499a35204107398be5f"},
+    {file = "sqlalchemy_filter_converter-1.3.1.tar.gz", hash = "sha256:8f2f3b1825d32600ef351a559894e9d07f9c85f087976be577da0ef504c88597"},
 ]
 
 [[package]]
