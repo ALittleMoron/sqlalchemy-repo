@@ -1,4 +1,4 @@
-name: Python package
+name: Testing
 
 on:
   workflow_call:
@@ -6,10 +6,6 @@ on:
       python-version:
         required: true
         type: string
-      poetry-version:
-        required: false
-        type: string
-        default: "1.8"
       coverage:
         required: false
         type: boolean
@@ -31,20 +27,6 @@ jobs:
     defaults:
       run:
         shell: bash
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ inputs.python-version }}
@@ -64,7 +46,7 @@ jobs:
         run: make install
       - name: Run the automated tests with coverage
         if: ${{ inputs.coverage }}
-        run: make tests
+        run: make test
       - name: Coverage Badge
         uses: tj-actions/coverage-badge-py@v2
       - name: Verify Changed files
