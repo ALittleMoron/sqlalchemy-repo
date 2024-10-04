@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
 
-    from sqlrepo.types import Filter, LoggerProtocol
+    from sqlrepo.types import FilterType, LoggerProtocol
 
     BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
     T = TypeVar("T")

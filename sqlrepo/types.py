@@ -15,4 +15,4 @@ class LoggerProtocol(Protocol):
     def fatal(self, msg: Any, *args: Any, **kwargs: Any) -> None: ...
 
 
-Filter = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]
+FilterType = dict[str, Any] | Sequence[dict[str, Any] | ColumnElement[bool]] | ColumnElement[bool]

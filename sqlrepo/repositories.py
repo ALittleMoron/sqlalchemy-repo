@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     )
     from sqlalchemy.sql.elements import ColumnElement
 
-    from sqlrepo.types import Filter, LoggerProtocol
+    from sqlrepo.types import FilterType, LoggerProtocol
 
     class JoinKwargs(TypedDict):
         """Kwargs for join."""
@@ -206,7 +206,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _get(
         self,
         *,
-        filters: "Filter",
+        filters: "FilterType",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -389,7 +389,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _get(
         self,
         *,
-        filters: "Filter",
+        filters: "FilterType",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -557,7 +557,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
     async def get(
         self,
         *,
-        filters: "Filter",
+        filters: "FilterType",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -674,7 +674,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
     def get(
         self,
         *,
-        filters: "Filter",
+        filters: "FilterType",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
