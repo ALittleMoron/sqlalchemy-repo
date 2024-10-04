@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar, overload
 
 from dev_utils.common import get_utc_now
-from sqlalchemy import CursorResult, and_, delete, desc, func, insert, or_, select, update
+from sqlalchemy import CursorResult, and_, delete, desc, exists, func, insert, or_, select, update
 from sqlalchemy import exc as sqlalchemy_exc
 from sqlalchemy_dev_utils import apply_joins, get_sqlalchemy_attribute, is_queryable_attribute
 from sqlalchemy_filter_converter import BaseFilterConverter
@@ -326,6 +326,19 @@ class BaseQuery:
         )
         return update(model).where(*filters).values({disable_field: field_value})
 
+    def _exists_items_stmt(
+        self,
+        *,
+        model: type["BaseSQLAlchemyModel"],
+        filters: "Filter | None" = None,
+    ) -> "Select[tuple[bool]]":
+        """Generate SQLAlchemy stmt to check items for exist in database."""
+        exist_stmt = exists().select_from(model)
+        if filters is not None:
+            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            exist_stmt = exist_stmt.where(*sqlalchemy_filters)
+        return select(exist_stmt)
+
 
 class BaseSyncQuery(BaseQuery):
     """Base query class with sync interface."""
@@ -644,6 +657,16 @@ class BaseSyncQuery(BaseQuery):
             return result.rowcount
         return 0  # pragma: no coverage
 
+    def items_exists(
+        self,
+        model: type["BaseSQLAlchemyModel"],
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        stmt = self._exists_items_stmt(model=model, filters=filters)
+        result = self.session.scalar(stmt)
+        return result if result is not None else False
+
 
 class BaseAsyncQuery(BaseQuery):
     """Base query class with async interface."""
@@ -961,3 +984,13 @@ class BaseAsyncQuery(BaseQuery):
         ):
             return result.rowcount
         return 0  # pragma: no coverage
+
+    async def items_exists(
+        self,
+        model: type["BaseSQLAlchemyModel"],
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        stmt = self._exists_items_stmt(model=model, filters=filters)
+        result = await self.session.scalar(stmt)
+        return result if result is not None else False

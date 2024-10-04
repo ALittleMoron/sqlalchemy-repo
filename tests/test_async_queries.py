@@ -446,3 +446,48 @@ async def test_disable_items_direct_value(
         )
         == 0
     )
+
+
+@pytest.mark.asyncio()
+async def test_items_exists_success_any_item(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    await mymodel_async_factory(db_async_session, commit=False)
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    exists = await query_obj.items_exists(model=MyModel, filters=None)
+    assert exists is True
+
+
+@pytest.mark.asyncio()
+async def test_items_exists_success_direct_item(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    item = await mymodel_async_factory(db_async_session, commit=False)
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    exists = await query_obj.items_exists(model=MyModel, filters={"id": item.id})
+    assert exists is True
+
+
+@pytest.mark.asyncio()
+async def test_items_not_exists(  # noqa: D103
+    db_async_session: "AsyncSession",
+) -> None:
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    exists = await query_obj.items_exists(model=MyModel, filters=None)
+    assert exists is False
+
+
+@pytest.mark.asyncio()
+async def test_items_not_exists_direct_item(  # noqa: D103
+    db_async_session: "AsyncSession",
+    mymodel_async_factory: "AsyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    item = await mymodel_async_factory(db_async_session, commit=False)
+    await db_async_session.commit()
+    query_obj = BaseAsyncQuery(db_async_session, SimpleFilterConverter)
+    exists = await query_obj.items_exists(model=MyModel, filters={"id": -item.id})
+    assert exists is False

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import pytest
 from sqlalchemy_filter_converter import (
@@ -94,7 +94,10 @@ def test_validate_disable_attributes_raise_error() -> None:
         ("django", DjangoLikeFilterConverter),
     ],
 )
-def test_get_filter_convert_class(strategy: str, expected_class: Any) -> None:  # noqa: ANN401
+def test_get_filter_convert_class(
+    strategy: Literal["simple", "advanced", "django"],
+    expected_class: Any,
+) -> None:  # noqa: ANN401
     class CorrectRepo(BaseRepository[MyModel]):
         config = RepositoryConfig(filter_convert_strategy=strategy)
 

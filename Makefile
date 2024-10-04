@@ -32,8 +32,9 @@ lint:
 .PHONY: fix
 fix:
 	@if [ -z $(PDM) ]; then echo "PDM could not be found."; exit 2; fi
-	$(PDM) run ruff check $(NAME) --config ./pyproject.toml --fix
+	$(PDM) run black --config ./pyproject.toml ./tests
 	$(PDM) run black --config ./pyproject.toml $(NAME)
+	$(PDM) run ruff check $(NAME) --config ./pyproject.toml --fix
 
 .PHONY: tests
 tests:

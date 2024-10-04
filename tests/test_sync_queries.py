@@ -432,3 +432,42 @@ def test_disable_items_direct_value(
         )
         == 0
     )
+
+
+def test_items_exists_success_any_item(  # noqa: D103
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    mymodel_sync_factory(db_sync_session, commit=False)
+    db_sync_session.commit()
+    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
+    exists = query_obj.items_exists(model=MyModel, filters=None)
+    assert exists is True
+
+
+def test_items_exists_success_direct_item(  # noqa: D103
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    item = mymodel_sync_factory(db_sync_session, commit=False)
+    db_sync_session.commit()
+    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
+    exists = query_obj.items_exists(model=MyModel, filters={"id": item.id})
+    assert exists is True
+
+
+def test_items_not_exists(db_sync_session: "Session") -> None:  # noqa: D103
+    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
+    exists = query_obj.items_exists(model=MyModel, filters=None)
+    assert exists is False
+
+
+def test_items_not_exists_direct_item(  # noqa: D103
+    db_sync_session: "Session",
+    mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
+) -> None:
+    item = mymodel_sync_factory(db_sync_session, commit=False)
+    db_sync_session.commit()
+    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter)
+    exists = query_obj.items_exists(model=MyModel, filters={"id": -item.id})
+    assert exists is False

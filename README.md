@@ -19,8 +19,6 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
 * [ ] Add more backends for repository pattern. Now, only SQLAlchemy adapter implemented. I want
       to implement other backends to make this repository better to use in different situations.
       NOTE: in future sqlrepo will be replaced with something like python-repository-pattern.
-* [ ] Add more test cases for main functionality. Now, tested only base cases of repository
-    method use.
 * [x] Add wrapper for all non sqlrepo exceptions. Now, some functionality could raise
       "raw" SQLAlchemy error. I want to avoid the situation, when developer make
       try-except with all possible exceptions, when works with my package.
@@ -33,9 +31,26 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
 * [x] Add pydantic-like configuration. Current implementation works on ClassVar. I want to separate
       configuration and main repository code.
       NOTE: added since 3.0.0
+* [ ] Improve messages in warnings and exceptions. Now some of them (for example, warnings in
+      repository model_class checker method - __init_subclass__) have generic message, that has
+      not enough context to understand it and locate incorrect usage code. 
 
 If all these todo items are finished, it means, that all, what I want, is implemented.
 If you want to give me advice or feedback, you are welcome.
+
+Refactoring plans:
+
+* [ ] Add more test cases for main functionality. Now, tested only base cases of repository
+  method use.
+* [ ] Change existing tests: wrap some of them (for example, repository tests) to class with
+      helpers and class scoped fixtures.
+* [ ] change __init_subclass__ - now it very complicated. Maybe I should remove some checks in it
+      or maybe delete method itself, and make user set model_class attribute by himself.
+
+Bug fixes plans:
+
+- [ ] Now auto-setup for model_class attribute works incorrect in some cases. For example, in case,
+      when user use multiple inheritance with repository class not first in order.
 
 ## Install
 

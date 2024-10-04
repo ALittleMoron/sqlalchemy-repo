@@ -120,7 +120,7 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
             )
             raise sqlrepo_exc.RepositoryAttributeError(msg)
 
-    def __init_subclass__(cls) -> None:  # noqa: D105
+    def __init_subclass__(cls) -> None:  # noqa: D105 PLR0911
         super().__init_subclass__()
         if hasattr(cls, "model_class"):
             msg = (
@@ -205,8 +205,8 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
 
     async def _get(
         self,
-        filters: "Filter",
         *,
+        filters: "Filter",
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -230,6 +230,18 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             return await self.queries.get_items_count(
                 model=self.model_class,
                 joins=joins,
+                filters=filters,
+            )
+
+    async def _exists(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        with wrap_any_exception_manager():
+            return await self.queries.items_exists(
+                model=self.model_class,
                 filters=filters,
             )
 
@@ -404,6 +416,18 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 filters=filters,
             )
 
+    def _exists(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        with wrap_any_exception_manager():
+            return self.queries.items_exists(
+                model=self.model_class,
+                filters=filters,
+            )
+
     def _list(
         self,
         *,
@@ -523,3 +547,237 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 extra_filters=extra_filters,
                 use_flush=self.config.use_flush,
             )
+
+
+class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
+    """Async repository class with implemented base methods."""
+
+    __inheritance_check_model_class__ = False
+
+    async def get(
+        self,
+        *,
+        filters: "Filter",
+        joins: "Sequence[Join] | None" = None,
+        loads: "Sequence[Load] | None" = None,
+    ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model_class by given filters."""
+        return await self._get(filters=filters, joins=joins, loads=loads)
+
+    async def count(
+        self,
+        *,
+        filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
+    ) -> int:
+        """Get count of instances of model_class by given filters."""
+        return await self._count(filters=filters, joins=joins)
+
+    async def exists(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        return await self._exists(filters=filters)
+
+    async def list(
+        self,
+        *,
+        filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
+        loads: "Sequence[Load] | None" = None,
+        search: str | None = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model_class."""
+        return await self._list(
+            filters=filters,
+            joins=joins,
+            loads=loads,
+            search=search,
+            search_by=search_by,
+            order_by=order_by,
+            limit=limit,
+            offset=offset,
+        )
+
+    @overload
+    async def create(
+        self,
+        *,
+        data: "DataDict | None",
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    async def create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    async def create(
+        self,
+        *,
+        data: "DataDict | Sequence[DataDict] | None",
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+        """Create model_class instance from given data."""
+        return await self._create(data=data)
+
+    async def update(
+        self,
+        *,
+        data: "DataDict",
+        filters: "Filter | None" = None,
+    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+        """Update model_class from given data."""
+        return await self._update(data=data, filters=filters)
+
+    async def update_instance(
+        self,
+        *,
+        instance: "BaseSQLAlchemyModel",
+        data: "DataDict",
+    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
+        """Update model_class instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
+        return await self._update_instance(instance=instance, data=data)
+
+    async def delete(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> "Count":
+        """Delete model_class in db by given filters."""
+        return await self._delete(filters=filters)
+
+    async def disable(
+        self,
+        *,
+        ids_to_disable: set[Any],
+        extra_filters: "Filter | None" = None,
+    ) -> "Count":
+        """Disable model_class instances with given ids and extra_filters."""
+        return await self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)
+
+
+class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
+    """Sync repository class with implemented base methods."""
+
+    __inheritance_check_model_class__ = False
+
+    def get(
+        self,
+        *,
+        filters: "Filter",
+        joins: "Sequence[Join] | None" = None,
+        loads: "Sequence[Load] | None" = None,
+    ) -> "BaseSQLAlchemyModel | None":
+        """Get one instance of model_class by given filters."""
+        return self._get(filters=filters, joins=joins, loads=loads)
+
+    def count(
+        self,
+        *,
+        filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
+    ) -> int:
+        """Get count of instances of model_class by given filters."""
+        return self._count(filters=filters, joins=joins)
+
+    def exists(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> bool:
+        """Check rows in table for existing."""
+        return self._exists(filters=filters)
+
+    def list(
+        self,
+        *,
+        filters: "Filter | None" = None,
+        joins: "Sequence[Join] | None" = None,
+        loads: "Sequence[Load] | None" = None,
+        search: str | None = None,
+        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
+        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Get list of instances of model_class."""
+        return self._list(
+            filters=filters,
+            joins=joins,
+            loads=loads,
+            search=search,
+            search_by=search_by,
+            order_by=order_by,
+            limit=limit,
+            offset=offset,
+        )
+
+    @overload
+    def create(
+        self,
+        *,
+        data: "DataDict | None",
+    ) -> "BaseSQLAlchemyModel": ...
+
+    @overload
+    def create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+
+    def create(
+        self,
+        *,
+        data: "DataDict | Sequence[DataDict] | None",
+    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+        """Create model_class instance from given data."""
+        return self._create(data=data)
+
+    def update(
+        self,
+        *,
+        data: "DataDict",
+        filters: "Filter | None" = None,
+    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+        """Update model_class from given data."""
+        return self._update(data=data, filters=filters)
+
+    def update_instance(
+        self,
+        *,
+        instance: "BaseSQLAlchemyModel",
+        data: "DataDict",
+    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
+        """Update model_class instance from given data.
+
+        Returns tuple with boolean (was instance updated or not) and updated instance.
+        """
+        return self._update_instance(instance=instance, data=data)
+
+    def delete(
+        self,
+        *,
+        filters: "Filter | None" = None,
+    ) -> "Count":
+        """Delete model_class in db by given filters."""
+        return self._delete(filters=filters)
+
+    def disable(
+        self,
+        *,
+        ids_to_disable: set[Any],
+        extra_filters: "Filter | None" = None,
+    ) -> "Count":
+        """Disable model_class instances with given ids and extra_filters."""
+        return self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)

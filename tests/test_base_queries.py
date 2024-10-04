@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun import freeze_time
-from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, update
+from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, select, update, exists
 from sqlalchemy.orm import joinedload
 from sqlalchemy_dev_utils.exc import NoModelAttributeError
 from sqlalchemy_filter_converter import SimpleFilterConverter
@@ -667,3 +667,19 @@ def test_disable_items_stmt_value_error():  # noqa
             allow_filter_by_value=True,
             extra_filters=None,
         )
+
+
+@pytest.mark.parametrize(
+    ('filters', "expected_result"),
+    [
+        (None, select(exists().select_from(MyModel))),
+        ({"id": 25}, select(exists().where(MyModel.id == 25))),
+    ],
+)
+def test_exists_items_stmt(
+    filters: Any,  # noqa
+    expected_result: bool,  # noqa
+) -> None:
+    query = BaseQuery(SimpleFilterConverter)
+    disable_items_stmt = query._exists_items_stmt(model=MyModel, filters=filters)
+    assert str(disable_items_stmt) == str(expected_result)
