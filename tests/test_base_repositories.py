@@ -9,6 +9,7 @@ from sqlalchemy_filter_converter import (
 
 from sqlrepo.config import RepositoryConfig
 from sqlrepo.exc import RepositoryAttributeError
+from sqlrepo import constants as c
 from sqlrepo.repositories import BaseRepository, RepositoryModelClassIncorrectUseWarning
 from tests.utils import MyModel
 
@@ -47,7 +48,7 @@ def test_eval_forward_ref() -> None:
 def test_generic_incorrect_type() -> None:
     with pytest.warns(
         RepositoryModelClassIncorrectUseWarning,
-        match="Passed GenericType is not SQLAlchemy model declarative class.",
+        match=c.REPOSITORY_GENERIC_TYPE_IS_NOT_MODEL,
     ):
 
         class MyRepo(BaseRepository[int]): ...
@@ -56,10 +57,19 @@ def test_generic_incorrect_type() -> None:
 def test_no_generic() -> None:
     with pytest.warns(
         RepositoryModelClassIncorrectUseWarning,
-        match="GenericType was not passed for SQLAlchemy model declarative class.",
+        match=c.REPOSITORY_GENERIC_TYPE_NOT_PASSED_WARNING,
     ):
 
         class MyRepo(BaseRepository): ...
+
+
+def test_generic_not_class() -> None:
+    with pytest.warns(
+        RepositoryModelClassIncorrectUseWarning,
+        match=c.REPOSITORY_GENERIC_TYPE_IS_NOT_CLASS_WARNING,
+    ):
+
+        class MyRepo(BaseRepository['25']): ...
 
 
 def test_correct_use() -> None:

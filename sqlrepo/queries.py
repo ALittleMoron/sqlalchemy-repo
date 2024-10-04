@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
 
+    # noinspection PyUnresolvedReferences
     from sqlrepo.types import FilterType, LoggerProtocol
 
     BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
@@ -138,7 +139,7 @@ class BaseQuery:
         disable_field: "QueryableAttribute[Any]",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "Filter | None" = None,
+        extra_filters: "FilterType | None" = None,
     ) -> list["ColumnElement[bool]"]:
         """Generate disable filters from given data."""
         filters: list["ColumnElement[bool]"] = [id_field.in_(ids_to_disable)]
@@ -179,7 +180,7 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "Select[tuple[BaseSQLAlchemyModel]]":
@@ -199,7 +200,7 @@ class BaseQuery:
         *,
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> "Select[tuple[int]]":
         """Generate SQLAlchemy stmt to get count of items from filters and joins."""
         stmt = select(func.count()).select_from(model)
@@ -216,7 +217,7 @@ class BaseQuery:
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         search: str | None = None,
         search_by: "SearchParam | Iterable[SearchParam] | None" = None,
         order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
@@ -272,7 +273,7 @@ class BaseQuery:
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> "ReturningUpdate[tuple[BaseSQLAlchemyModel]]":
         """Generate SQLAlchemy stmt to update items with given data."""
         stmt = update(model)
@@ -285,7 +286,7 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> "Delete":
         """Generate SQLAlchemy stmt to delete items with given data."""
         stmt = delete(model)
@@ -303,7 +304,7 @@ class BaseQuery:
         disable_field: "InstrumentedAttribute[Any]",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "Filter | None" = None,
+        extra_filters: "FilterType | None" = None,
     ) -> "Update":
         """Generate SQLAlchemy stmt to disable items with given data."""
         if not issubclass(field_type, datetime.datetime | bool):
@@ -330,7 +331,7 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> "Select[tuple[bool]]":
         """Generate SQLAlchemy stmt to check items for exist in database."""
         exist_stmt = exists().select_from(model)
@@ -361,7 +362,7 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -380,7 +381,7 @@ class BaseSyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> int:
         """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
@@ -400,7 +401,7 @@ class BaseSyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         search: str | None = None,
         search_by: "SearchParam | Iterable[SearchParam] | None" = None,
         order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
@@ -513,7 +514,7 @@ class BaseSyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Update model from given data."""
@@ -570,7 +571,7 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Delete model in db by given filters."""
@@ -622,7 +623,7 @@ class BaseSyncQuery(BaseQuery):
         disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "Filter | None" = None,
+        extra_filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Disable model instances with given ids and extra_filters."""
@@ -660,7 +661,7 @@ class BaseSyncQuery(BaseQuery):
     def items_exists(
         self,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         stmt = self._exists_items_stmt(model=model, filters=filters)
@@ -689,7 +690,7 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
@@ -708,7 +709,7 @@ class BaseAsyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> int:
         """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
@@ -728,7 +729,7 @@ class BaseAsyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         joins: "Sequence[Join] | None" = None,
         loads: "Sequence[Load] | None" = None,
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         search: str | None = None,
         search_by: "SearchParam | Iterable[SearchParam] | None" = None,
         order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
@@ -841,7 +842,7 @@ class BaseAsyncQuery(BaseQuery):
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Update model from given data."""
@@ -898,7 +899,7 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Delete model in db by given filters."""
@@ -950,7 +951,7 @@ class BaseAsyncQuery(BaseQuery):
         disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "Filter | None" = None,
+        extra_filters: "FilterType | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Disable model instances with given ids and extra_filters."""
@@ -988,7 +989,7 @@ class BaseAsyncQuery(BaseQuery):
     async def items_exists(
         self,
         model: type["BaseSQLAlchemyModel"],
-        filters: "Filter | None" = None,
+        filters: "FilterType | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         stmt = self._exists_items_stmt(model=model, filters=filters)

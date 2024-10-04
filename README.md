@@ -31,9 +31,10 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
 * [x] Add pydantic-like configuration. Current implementation works on ClassVar. I want to separate
       configuration and main repository code.
       NOTE: added since 3.0.0
-* [ ] Improve messages in warnings and exceptions. Now some of them (for example, warnings in
+* [x] Improve messages in warnings and exceptions. Now some of them (for example, warnings in
       repository model_class checker method - __init_subclass__) have generic message, that has
       not enough context to understand it and locate incorrect usage code. 
+      NOTE: added since 5.1.2
 
 If all these todo items are finished, it means, that all, what I want, is implemented.
 If you want to give me advice or feedback, you are welcome.
@@ -91,9 +92,13 @@ class YourModelSyncRepository(BaseSyncRepository[YourModel]):
           return self._get(filters={"your_model_id": your_model_id})
 
 class YourModelAsyncRepository(BaseAsyncRepository[YourModel]):
-    pass
+      async def get(self, your_model_id: int) -> YourModel:
+            return await self._get(filters={"your_model_id": your_model_id})
 ```
 
+If you don't want to specify your methods and want to use private methods directly, you should
+inherit your repository with ``SyncRepository``, ``AsyncRepository``, which implements all
+repository methods.
 
 ## Configuration
 
@@ -124,19 +129,25 @@ Use case:
 ```python
 from my_package.models import Admin
 
-class AdminRepository(BaseSyncRepository[Admin]):
+from sqlrepo import SyncRepository
+
+
+class AdminRepository(SyncRepository[Admin]):
     ...
 
-# So, when you will use AdminRepository, model_class attribute will be set with Admin
-# automatically.
 ```
+
+So, when you will use AdminRepository, model_class attribute will be set with Admin  automatically.
 
 or you can do it twice like this:
 
 ```python
 from my_package.models import Admin
 
-class AdminRepository(BaseSyncRepository[Admin]):
+from sqlrepo import SyncRepository
+
+
+class AdminRepository(SyncRepository[Admin]):
     model_class = Admin
 ```
 
@@ -156,16 +167,16 @@ strings.
 ```python
 from my_package.models import Admin
 
-class AdminRepository(BaseSyncRepository[Admin]):
+from sqlrepo import SyncRepository, RepositoryConfig
+
+
+class AdminRepository(SyncRepository[Admin]):
     config = RepositoryConfig(
         specific_column_mapping={
             "custom_field": Admin.id,
             "other_field": Admin.name,
         }
     )
-    
-    def list(self, filters: "dict[str, Any] | None" = None):
-          return self._list(filters=filters)
 
 
 admins = AdminRepository(session).list(
@@ -292,13 +303,9 @@ safe, so be careful.
 First of all You need to prepare all to work with plugin:
 
 ```python
-from functools import cached_property
-
 from fastapi import FastAPI
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-
-from sqlrepo import BaseSyncRepository
 
 engine = create_engine("<your-db-url-here>")
 Session = sessionmaker(engine)
@@ -334,18 +341,22 @@ then you can implements containers and services like this:
 ```python
 # your prepared code below
 
+from functools import cached_property
 from pydantic import BaseModel, ConfigDict
 
+from sqlrepo import BaseSyncRepository
 from sqlrepo.ext.fastapi import BaseSyncContainer, BaseSyncService
 
 
 class YourModelDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    
     ...
 
 
 class YourModelList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    
     ...
 
 

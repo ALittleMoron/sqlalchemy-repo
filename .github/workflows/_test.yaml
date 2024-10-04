@@ -46,7 +46,7 @@ jobs:
         run: make install
       - name: Run the automated tests with coverage
         if: ${{ inputs.coverage }}
-        run: make test
+        run: make tests
       - name: Coverage Badge
         uses: tj-actions/coverage-badge-py@v2
       - name: Verify Changed files
