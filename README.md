@@ -39,19 +39,6 @@ or use. I want to simplify work with repositories, so this is TODO for my projec
 If all these todo items are finished, it means, that all, what I want, is implemented.
 If you want to give me advice or feedback, you are welcome.
 
-Refactoring plans:
-
-* [ ] Add more test cases for main functionality. Now, tested only base cases of repository
-  method use.
-* [ ] Change existing tests: wrap some of them (for example, repository tests) to class with
-      helpers and class scoped fixtures.
-* [ ] change __init_subclass__ - now it very complicated. Maybe I should remove some checks in it
-      or maybe delete method itself, and make user set model_class attribute by himself.
-
-Bug fixes plans:
-
-- [ ] Now auto-setup for model_class attribute works incorrect in some cases. For example, in case,
-      when user use multiple inheritance with repository class not first in order.
 
 ## Install
 

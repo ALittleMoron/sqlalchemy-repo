@@ -2,6 +2,10 @@ import warnings
 from typing import Any
 
 
+class RepositoryModelClassIncorrectUseWarning(Warning):
+    """Warning about Repository model_class attribute incorrect usage."""
+
+
 class WarningWrapperLogger:
     def log_warn(self, msg: Any, *args: Any, **kwargs: Any) -> None:
         """Wrapper for warn function."""

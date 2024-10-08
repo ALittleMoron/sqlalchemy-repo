@@ -27,7 +27,10 @@ lint.ignore = [
     "UP037",
     "PLC0414",
     "COM812",
-    "ISC001"
+    "ISC001",
+    "FIX002",
+    "TD002",
+    "TD003"
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -131,7 +134,7 @@ venv = ".venv"
 
 [project]
 name = "sqlrepo"
-version = "5.1.2"
+version = "5.2.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"

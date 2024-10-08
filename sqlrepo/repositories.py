@@ -28,9 +28,10 @@ from sqlrepo.constants import (
     REPOSITORY_GETTING_GENERIC_INFO_WARNING_TEMPLATE,
     REPOSITORY_MODEL_ALREADY_DEFINED_WARNING,
     REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE,
-    REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR,
+    REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR, REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
+    REPOSITORY_NO_GENERIC_INHERITANCE_WARNING,
 )
-from sqlrepo.logger import default_logger
+from sqlrepo.logger import RepositoryModelClassIncorrectUseWarning, default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
 from sqlrepo.wrappers import wrap_any_exception_manager
 
@@ -73,8 +74,88 @@ BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
 IsUpdated: TypeAlias = bool
 
 
-class RepositoryModelClassIncorrectUseWarning(Warning):
-    """Warning about Repository model_class attribute incorrect usage."""
+def extract_model_from_generic(cls: type[Any]) -> "type[Base] | None":  # noqa: PLR0911 C901
+    """Iterate through cls generics and returns SQLAlchemy declarative model.
+
+    If there are errors in inheritance or problem with extracting model, it causes None return.
+    """
+    if hasattr(cls, "model_class"):
+        warnings.warn(
+            REPOSITORY_MODEL_ALREADY_DEFINED_WARNING,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    # NOTE: impossible situation. May be reproduced if user manually delete generic from inherited
+    #       class.
+    if not hasattr(cls, '__orig_bases__'):  # pragma: no coverage
+        warnings.warn(
+            REPOSITORY_NO_GENERIC_INHERITANCE_WARNING,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    model = None
+    # PEP-560: https://peps.python.org/pep-0560/
+    exceptions = []
+    for base in cls.__orig_bases__:
+        try:
+            if issubclass(base.__origin__, BaseRepository):
+                model = get_args(base)[0]
+                break
+        except (TypeError, IndexError, AttributeError) as exc:
+            exceptions.append(exc)
+    if model is None or len(cls.__orig_bases__) == 0:
+        warnings.warn(
+            REPOSITORY_GENERIC_TYPE_NOT_PASSED_WARNING,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    if len(exceptions) == len(cls.__orig_bases__):
+        warnings.warn(
+            REPOSITORY_GETTING_GENERIC_INFO_WARNING_TEMPLATE.format(cls=cls, exc=exceptions),
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    if isinstance(model, ForwardRef):
+        try:
+            repo_module = vars(cls).get("__module__")
+            if not repo_module:  # pragma: no coverage
+                msg = REPOSITORY_GET_MODULE_INSTANCE_ERROR_TEMPLATE.format(cls=cls)
+                raise TypeError(msg)  # noqa: TRY301
+            model_globals = vars(importlib.import_module(repo_module))
+            model = eval(model.__forward_arg__, model_globals)  # noqa: S307
+        except (ImportError, TypeError, AttributeError, NameError) as exc:
+            warnings.warn(
+                REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE.format(exc=exc),
+                RepositoryModelClassIncorrectUseWarning,
+                stacklevel=2,
+            )
+            return None
+    if isinstance(model, TypeVar):
+        warnings.warn(
+            REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    if not isclass(model):
+        warnings.warn(
+            REPOSITORY_GENERIC_TYPE_IS_NOT_CLASS_WARNING,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    if not issubclass(model, Base):
+        warnings.warn(
+            REPOSITORY_GENERIC_TYPE_IS_NOT_MODEL,
+            RepositoryModelClassIncorrectUseWarning,
+            stacklevel=2,
+        )
+        return None
+    return model
 
 
 class BaseRepository(Generic[BaseSQLAlchemyModel]):
@@ -127,67 +208,15 @@ class BaseRepository(Generic[BaseSQLAlchemyModel]):
         ):
             raise sqlrepo_exc.RepositoryAttributeError(REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR)
 
-    def __init_subclass__(cls) -> None:  # noqa: D105 PLR0911
+    def __init_subclass__(cls) -> None:  # noqa: D105
         super().__init_subclass__()
         if cls.__inheritance_check_model_class__ is False:
             cls.__inheritance_check_model_class__ = True
             return
-        if hasattr(cls, "model_class"):
-            warnings.warn(
-                REPOSITORY_MODEL_ALREADY_DEFINED_WARNING,
-                RepositoryModelClassIncorrectUseWarning,
-                stacklevel=2,
-            )
+        model_class = extract_model_from_generic(cls)
+        if model_class is None:
             return
-        try:
-            # PEP-560: https://peps.python.org/pep-0560/
-            # NOTE: this code is needed for getting type from generic: Generic[int] -> int type
-            # get_args get params from __orig_bases__, that contains Generic passed types.
-            model, *_ = get_args(cls.__orig_bases__[0])  # type: ignore[reportAttributeAccessIssue]
-        except (AttributeError, IndexError, TypeError) as exc:
-            warnings.warn(
-                REPOSITORY_GETTING_GENERIC_INFO_WARNING_TEMPLATE.format(cls=cls, exc=exc),
-                RepositoryModelClassIncorrectUseWarning,
-                stacklevel=2,
-            )
-            return
-        if isinstance(model, ForwardRef):
-            try:
-                repo_module = vars(cls).get("__module__")
-                if not repo_module:  # pragma: no coverage
-                    msg = REPOSITORY_GET_MODULE_INSTANCE_ERROR_TEMPLATE.format(cls=cls)
-                    raise TypeError(msg)  # noqa: TRY301
-                model_globals = vars(importlib.import_module(repo_module))
-                model = eval(model.__forward_arg__, model_globals)  # noqa: S307
-            except (ImportError, TypeError, AttributeError, NameError) as exc:
-                warnings.warn(
-                    REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE.format(exc=exc),
-                    RepositoryModelClassIncorrectUseWarning,
-                    stacklevel=2,
-                )
-                return
-        if isinstance(model, TypeVar):
-            warnings.warn(
-                REPOSITORY_GENERIC_TYPE_NOT_PASSED_WARNING,
-                RepositoryModelClassIncorrectUseWarning,
-                stacklevel=2,
-            )
-            return
-        if not isclass(model):
-            warnings.warn(
-                REPOSITORY_GENERIC_TYPE_IS_NOT_CLASS_WARNING,
-                RepositoryModelClassIncorrectUseWarning,
-                stacklevel=2,
-            )
-            return
-        if not issubclass(model, Base):
-            warnings.warn(
-                REPOSITORY_GENERIC_TYPE_IS_NOT_MODEL,
-                RepositoryModelClassIncorrectUseWarning,
-                stacklevel=2,
-            )
-            return
-        cls.model_class = model  # type: ignore[reportAttributeAccessIssue]
+        cls.model_class = model_class  # type: ignore[reportAttributeAccessIssue]
 
 
 class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):

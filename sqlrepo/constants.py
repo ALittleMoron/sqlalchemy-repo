@@ -4,6 +4,8 @@ generic_usage_postfix = (
     "``__inheritance_check_model_class__ = False`` in your repository class to disable this "
     "warning."
 )
+only_declarative_postfix = "Repository class can only work with SQLAlchemy declarative models."
+generic_usage_with_only_declarative_postfix = f'{only_declarative_postfix} {generic_usage_postfix}'
 
 REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR = (
     'Attribute "disable_id_field" or "disable_field" or "disable_field_type" not '
@@ -13,6 +15,9 @@ REPOSITORY_MODEL_ALREADY_DEFINED_WARNING = (
     "Don't change model_class attribute to class. Use generic syntax instead. "
     "See PEP 646 (https://peps.python.org/pep-0646/). Repository will automatically "
     "add model_class attribute by extracting it from Generic type. "
+) + generic_usage_postfix
+REPOSITORY_NO_GENERIC_INHERITANCE_WARNING = (
+    "Incorrect inheritance from Repository classes. Parent class has no generics."
 ) + generic_usage_postfix
 REPOSITORY_GETTING_GENERIC_INFO_WARNING_TEMPLATE = (
     "Error during getting information about Generic types for {cls.__name__}. "
@@ -28,10 +33,12 @@ REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE = (
 REPOSITORY_GENERIC_TYPE_NOT_PASSED_WARNING = (
     "GenericType was not passed for SQLAlchemy model declarative class. "
 ) + generic_usage_postfix
+REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING = (
+    "GenericType is TypeVar. "
+) + generic_usage_postfix
 REPOSITORY_GENERIC_TYPE_IS_NOT_CLASS_WARNING = (
     "Passed GenericType is not a class. "
-) + generic_usage_postfix
+) + generic_usage_with_only_declarative_postfix
 REPOSITORY_GENERIC_TYPE_IS_NOT_MODEL = (
-    "Passed GenericType is not SQLAlchemy model declarative class. Repository class can only work "
-    "with SQLAlchemy declarative models. "
-) + generic_usage_postfix
+    "Passed GenericType is not SQLAlchemy model declarative class.  "
+) + generic_usage_with_only_declarative_postfix
