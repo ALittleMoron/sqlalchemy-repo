@@ -51,8 +51,8 @@ def test_extract_model_from_generic_no_generic() -> None:
 
 def test_extract_model_from_generic_type_var() -> None:
     with pytest.warns(
-            RepositoryModelClassIncorrectUseWarning,
-            match=c.REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
+        RepositoryModelClassIncorrectUseWarning,
+        match=c.REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
     ):
 
         class MyRepo(BaseRepository[T]): ...
@@ -83,4 +83,3 @@ def test_extract_model_from_generic_left_multiple_inheritance_correct_use() -> N
     class CorrectRepo(BaseRepository[MyModel], int): ...
 
     assert CorrectRepo.model_class == MyModel
-

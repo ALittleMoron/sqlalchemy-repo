@@ -13,23 +13,24 @@ from typing import (
     TypedDict,
     TypeVar,
     get_args,
-    overload,
 )
 
 from sqlalchemy.orm import DeclarativeBase as Base
 
 from sqlrepo import exc as sqlrepo_exc
+from sqlrepo.abc import AbstractAsyncRepository, AbstractSyncRepository
 from sqlrepo.config import RepositoryConfig
 from sqlrepo.constants import (
     REPOSITORY_GENERIC_TYPE_IS_NOT_CLASS_WARNING,
     REPOSITORY_GENERIC_TYPE_IS_NOT_MODEL,
     REPOSITORY_GENERIC_TYPE_NOT_PASSED_WARNING,
+    REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
     REPOSITORY_GET_MODULE_INSTANCE_ERROR_TEMPLATE,
     REPOSITORY_GETTING_GENERIC_INFO_WARNING_TEMPLATE,
     REPOSITORY_MODEL_ALREADY_DEFINED_WARNING,
-    REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE,
-    REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR, REPOSITORY_GENERIC_TYPE_TYPE_VAR_PASSED_WARNING,
     REPOSITORY_NO_GENERIC_INHERITANCE_WARNING,
+    REPOSITORY_RESOLVE_FORWARD_REF_WARNING_TEMPLATE,
+    REPOSITORY_VALIDATE_DISABLE_ATTRIBUTES_ERROR,
 )
 from sqlrepo.logger import RepositoryModelClassIncorrectUseWarning, default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
@@ -74,7 +75,7 @@ BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
 IsUpdated: TypeAlias = bool
 
 
-def extract_model_from_generic(cls: type[Any]) -> "type[Base] | None":  # noqa: PLR0911 C901
+def extract_model_from_generic(cls: type[Any]) -> "type[Base] | None":  # noqa: PLR0911 PLR0912 C901
     """Iterate through cls generics and returns SQLAlchemy declarative model.
 
     If there are errors in inheritance or problem with extracting model, it causes None return.
@@ -312,25 +313,23 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 unique_items=self.config.unique_list_items,
             )
 
-    @overload
+    async def _bulk_create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Create sequence model_class of instances from given data."""
+        with wrap_any_exception_manager():
+            return await self.queries.db_create(
+                model=self.model_class,
+                data=data,
+            )
+
     async def _create(
         self,
         *,
         data: "DataDict | None",
-    ) -> "BaseSQLAlchemyModel": ...
-
-    @overload
-    async def _create(
-        self,
-        *,
-        data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    async def _create(
-        self,
-        *,
-        data: "DataDict | Sequence[DataDict] | None",
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+    ) -> "BaseSQLAlchemyModel":
         """Create model_class instance from given data."""
         with wrap_any_exception_manager():
             return await self.queries.db_create(
@@ -495,25 +494,23 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
                 unique_items=self.config.unique_list_items,
             )
 
-    @overload
+    def _bulk_create(
+        self,
+        *,
+        data: "Sequence[DataDict]",
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Create sequence model_class of instances from given data."""
+        with wrap_any_exception_manager():
+            return self.queries.db_create(
+                model=self.model_class,
+                data=data,
+            )
+
     def _create(
         self,
         *,
         data: "DataDict | None",
-    ) -> "BaseSQLAlchemyModel": ...
-
-    @overload
-    def _create(
-        self,
-        *,
-        data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    def _create(
-        self,
-        *,
-        data: "DataDict | Sequence[DataDict] | None",
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+    ) -> "BaseSQLAlchemyModel":
         """Create model_class instance from given data."""
         with wrap_any_exception_manager():
             return self.queries.db_create(
@@ -589,7 +586,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
             )
 
 
-class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
+class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRepository):
     """Async repository class with implemented base methods."""
 
     __inheritance_check_model_class__ = False
@@ -645,27 +642,21 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
             offset=offset,
         )
 
-    @overload
     async def create(
         self,
         *,
         data: "DataDict | None",
-    ) -> "BaseSQLAlchemyModel": ...
+    ) -> "BaseSQLAlchemyModel":
+        """Create model_class instance from given data."""
+        return await self._create(data=data)
 
-    @overload
-    async def create(
+    async def bulk_create(
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    async def create(
-        self,
-        *,
-        data: "DataDict | Sequence[DataDict] | None",
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
-        """Create model_class instance from given data."""
-        return await self._create(data=data)
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Create sequence model_class of instances from given data."""
+        return await self._bulk_create(data=data)
 
     async def update(
         self,
@@ -681,7 +672,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
         *,
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
+    ) -> "tuple[bool, BaseSQLAlchemyModel]":
         """Update model_class instance from given data.
 
         Returns tuple with boolean (was instance updated or not) and updated instance.
@@ -692,7 +683,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
         self,
         *,
         filters: "FilterType | None" = None,
-    ) -> "Count":
+    ) -> int:
         """Delete model_class in db by given filters."""
         return await self._delete(filters=filters)
 
@@ -701,12 +692,12 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel]):
         *,
         ids_to_disable: set[Any],
         extra_filters: "FilterType | None" = None,
-    ) -> "Count":
+    ) -> int:
         """Disable model_class instances with given ids and extra_filters."""
         return await self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)
 
 
-class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
+class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncRepository):
     """Sync repository class with implemented base methods."""
 
     __inheritance_check_model_class__ = False
@@ -762,27 +753,21 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
             offset=offset,
         )
 
-    @overload
     def create(
         self,
         *,
         data: "DataDict | None",
-    ) -> "BaseSQLAlchemyModel": ...
+    ) -> "BaseSQLAlchemyModel":
+        """Create model_class instance from given data."""
+        return self._create(data=data)
 
-    @overload
-    def create(
+    def bulk_create(
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    def create(
-        self,
-        *,
-        data: "DataDict | Sequence[DataDict] | None",
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
-        """Create model_class instance from given data."""
-        return self._create(data=data)
+    ) -> "Sequence[BaseSQLAlchemyModel]":
+        """Create sequence model_class of instances from given data."""
+        return self._bulk_create(data=data)
 
     def update(
         self,
@@ -798,7 +783,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
         *,
         instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
+    ) -> "tuple[bool, BaseSQLAlchemyModel]":
         """Update model_class instance from given data.
 
         Returns tuple with boolean (was instance updated or not) and updated instance.
@@ -809,7 +794,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
         self,
         *,
         filters: "FilterType | None" = None,
-    ) -> "Count":
+    ) -> int:
         """Delete model_class in db by given filters."""
         return self._delete(filters=filters)
 
@@ -818,6 +803,6 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel]):
         *,
         ids_to_disable: set[Any],
         extra_filters: "FilterType | None" = None,
-    ) -> "Count":
+    ) -> int:
         """Disable model_class instances with given ids and extra_filters."""
         return self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)

@@ -7,5 +7,5 @@ from .repositories import BaseAsyncRepository as BaseAsyncRepository
 from .repositories import BaseRepository as BaseRepository
 from .repositories import BaseSyncRepository as BaseSyncRepository
 from .repositories import SyncRepository as SyncRepository
-from .types import FilterType as Filter
+from .types import FilterType as FilterType
 from .types import LoggerProtocol as LoggerProtocol

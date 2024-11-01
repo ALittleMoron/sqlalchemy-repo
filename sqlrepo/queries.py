@@ -27,8 +27,7 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm import DeclarativeBase as Base
-    from sqlalchemy.orm import QueryableAttribute
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
     from sqlalchemy.orm.session import Session
     from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
     from sqlalchemy.sql._typing import (
@@ -68,7 +67,7 @@ class BaseQuery:
     def __init__(
         self,
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
+        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.specific_column_mapping = specific_column_mapping
@@ -348,7 +347,7 @@ class BaseSyncQuery(BaseQuery):
         self,
         session: "Session",
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
+        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session
@@ -676,7 +675,7 @@ class BaseAsyncQuery(BaseQuery):
         self,
         session: "AsyncSession",
         filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "InstrumentedAttribute[Any]"] | None = None,
+        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session

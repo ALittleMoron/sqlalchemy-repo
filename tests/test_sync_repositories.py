@@ -15,6 +15,7 @@ from tests.utils import (
     assert_compare_db_item_with_dict,
     assert_compare_db_items,
     coin_flip,
+    assert_compare_db_item_list_with_list_of_dicts,
 )
 
 if TYPE_CHECKING:
@@ -104,76 +105,36 @@ def test_get_items_list(  # noqa: D103
     assert_compare_db_item_list(items, db_items)
 
 
-@pytest.mark.parametrize(
-    "create_data",
-    [
+def test_create(db_sync_session: "Session") -> None:
+    create_data = {
+        "name": text_faker.sentence(),
+        "other_name": text_faker.sentence(),
+        "dt": dt_faker.datetime(),
+        "bl": coin_flip(),
+    }
+    repo = MyModelRepo(db_sync_session)
+    db_item = repo.create(data=create_data)
+    assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
+
+
+def test_bulk_create(db_sync_session: "Session") -> None:
+    create_data = [
         {
             "name": text_faker.sentence(),
             "other_name": text_faker.sentence(),
             "dt": dt_faker.datetime(),
             "bl": coin_flip(),
         },
-        (
-            {
-                "name": text_faker.sentence(),
-                "other_name": text_faker.sentence(),
-                "dt": dt_faker.datetime(),
-                "bl": coin_flip(),
-            },
-            {
-                "name": text_faker.sentence(),
-                "other_name": text_faker.sentence(),
-                "dt": dt_faker.datetime(),
-                "bl": coin_flip(),
-            },
-        ),
-    ],
-)
-def test_db_create(
-    create_data: dict[str, Any],
-    db_sync_session: "Session",
-) -> None:
-    repo = MyModelRepo(db_sync_session)
-    db_item = repo.create(data=create_data)
-    if not isinstance(db_item, MyModel):
-        pytest.skip("No compare functions")
-    assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
-
-
-@pytest.mark.parametrize(
-    "create_data",
-    [
         {
             "name": text_faker.sentence(),
             "other_name": text_faker.sentence(),
             "dt": dt_faker.datetime(),
             "bl": coin_flip(),
         },
-        (
-            {
-                "name": text_faker.sentence(),
-                "other_name": text_faker.sentence(),
-                "dt": dt_faker.datetime(),
-                "bl": coin_flip(),
-            },
-            {
-                "name": text_faker.sentence(),
-                "other_name": text_faker.sentence(),
-                "dt": dt_faker.datetime(),
-                "bl": coin_flip(),
-            },
-        ),
-    ],
-)
-def test_create_item(
-    db_sync_session: "Session",
-    create_data: dict[str, Any],
-) -> None:
+    ]
     repo = MyModelRepo(db_sync_session)
-    db_item = repo.create(data=create_data)
-    if not isinstance(db_item, MyModel):
-        pytest.skip("No compare functions")
-    assert_compare_db_item_with_dict(db_item, create_data, skip_keys_check=True)
+    db_items = repo.bulk_create(data=create_data)
+    assert_compare_db_item_list_with_list_of_dicts(db_items, create_data, skip_keys_check=True)
 
 
 @pytest.mark.parametrize(

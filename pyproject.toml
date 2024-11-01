@@ -48,6 +48,7 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 "tests/*" = ["D103"]
 "*/types.py" = ["D", "ANN"]
 "*/logger.py" = ["D", "ANN", "ARG"]
+"*/abc.py" = ["D", "ANN"]
 
 
 [tool.black]
@@ -79,7 +80,7 @@ multi_line_output = 3
 [tool.coverage.run]
 source = ["sqlrepo"]
 branch = true
-omit = ['*/logger.py', '*/types.py']
+omit = ['*/logger.py', '*/types.py', '*/abc.py']
 
 [tool.coverage.report]
 exclude_lines = [
@@ -134,7 +135,7 @@ venv = ".venv"
 
 [project]
 name = "sqlrepo"
-version = "5.2.0"
+version = "5.3.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"

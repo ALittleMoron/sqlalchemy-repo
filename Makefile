@@ -27,7 +27,7 @@ lint:
 	$(PDM) run pyright $(NAME)
 	$(PDM) run black --config ./pyproject.toml --check $(NAME) --diff
 	$(PDM) run ruff check $(NAME)
-	$(PDM) run vulture $(NAME) --min-confidence 100 --exclude "*/types.py,*/logger.py"
+	$(PDM) run vulture $(NAME) --min-confidence 100 --exclude "*/types.py,*/logger.py,*/abc.py"
 
 .PHONY: fix
 fix:
@@ -42,3 +42,7 @@ tests:
 	$(PDM) run coverage run -m pytest -vv
 	$(PDM) run coverage xml
 	$(PDM) run coverage report --fail-under=95
+
+.PHONY: quality
+quality:
+	make fix lint tests

@@ -14,7 +14,7 @@ StrField: TypeAlias = str
 
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
 
 
 filter_convert_classes: Final[dict[FilterConverterStrategiesLiteral, type[BaseFilterConverter]]] = {
@@ -30,7 +30,7 @@ class RepositoryConfig:
     """Repository config as dataclass."""
 
     # TODO: add specific_column_mapping to filters, joins and loads.
-    specific_column_mapping: "dict[str, InstrumentedAttribute[Any]]" = field(default_factory=dict)
+    specific_column_mapping: "dict[str, QueryableAttribute[Any]]" = field(default_factory=dict)
     """
     Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.
 

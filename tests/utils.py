@@ -135,6 +135,17 @@ def assert_compare_db_item_list_with_dict(
             assert item_field_value == value, msg
 
 
+def assert_compare_db_item_list_with_list_of_dicts(
+    items: Sequence["DeclarativeBase"],
+    data: Sequence[dict[str, Any]],
+    *,
+    skip_keys_check: bool = False,
+) -> None:
+    assert len(items) == len(data), "length of items and data is different."
+    for item, data_ele in zip(items, data, strict=True):
+        assert_compare_db_item_with_dict(item=item, data=data_ele, skip_keys_check=skip_keys_check)
+
+
 def assert_compare_db_item_none_fields(item: "DeclarativeBase", none_fields: set[str]) -> None:
     """Assert compare model instance fields for none value."""
     for field in none_fields:
