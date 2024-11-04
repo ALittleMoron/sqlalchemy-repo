@@ -3,6 +3,7 @@
 import datetime
 import re
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 
@@ -18,6 +19,7 @@ from sqlalchemy_dev_utils import (
 )
 from sqlalchemy_filter_converter import BaseFilterConverter
 
+from sqlrepo.abc import AbstractAsyncQuery, AbstractSyncQuery
 from sqlrepo.exc import QueryError
 from sqlrepo.logger import default_logger
 
@@ -55,21 +57,16 @@ BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
 T = TypeVar("T")
 
 
+@dataclass(kw_only=True)
 class BaseQuery:
     """Base query class.
 
     Implements base logic for queries like generating statements or filters. Don't use it directly.
     """
 
-    def __init__(
-        self,
-        filter_converter: BaseFilterConverter,
-        specific_column_mapping: "SpecificColumnMapping | None" = None,
-        logger: "LoggerProtocol" = default_logger,
-    ) -> None:
-        self.specific_column_mapping = specific_column_mapping
-        self.filter_converter = filter_converter
-        self.logger = logger
+    filter_converter: BaseFilterConverter
+    specific_column_mapping: "SpecificColumnMapping | None" = field(default=None)
+    logger: "LoggerProtocol" = field(default=default_logger)
 
     def _resolve_specific_columns(
         self,
@@ -343,22 +340,11 @@ class BaseQuery:
         return select(exist_stmt)
 
 
-class BaseSyncQuery(BaseQuery):
+@dataclass(kw_only=True)
+class BaseSyncQuery(BaseQuery, AbstractSyncQuery):
     """Base query class with sync interface."""
 
-    def __init__(
-        self,
-        session: "Session",
-        filter_converter: BaseFilterConverter,
-        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
-        logger: "LoggerProtocol" = default_logger,
-    ) -> None:
-        self.session = session
-        super().__init__(
-            filter_converter=filter_converter,
-            specific_column_mapping=specific_column_mapping,
-            logger=logger,
-        )
+    session: "Session" = field()
 
     def get_item(
         self,
@@ -506,16 +492,16 @@ class BaseSyncQuery(BaseQuery):
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
-        for field, value in data.items():
+        for field_, value in data.items():
             if (
                 set_none
                 and value is None
-                and (allowed_none_fields != "*" and field not in allowed_none_fields)
+                and (allowed_none_fields != "*" and field_ not in allowed_none_fields)
             ):
                 continue
-            if not is_updated and getattr(item, field, None) != value:
+            if not is_updated and getattr(item, field_, None) != value:
                 is_updated = True
-            setattr(item, field, value)
+            setattr(item, field_, value)
         if use_flush:
             self.session.flush()
         else:
@@ -629,22 +615,11 @@ class BaseSyncQuery(BaseQuery):
         return result if result is not None else False
 
 
-class BaseAsyncQuery(BaseQuery):
+@dataclass(kw_only=True)
+class BaseAsyncQuery(BaseQuery, AbstractAsyncQuery):
     """Base query class with async interface."""
 
-    def __init__(
-        self,
-        session: "AsyncSession",
-        filter_converter: BaseFilterConverter,
-        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
-        logger: "LoggerProtocol" = default_logger,
-    ) -> None:
-        self.session = session
-        super().__init__(
-            filter_converter=filter_converter,
-            specific_column_mapping=specific_column_mapping,
-            logger=logger,
-        )
+    session: "AsyncSession" = field()
 
     async def get_item(
         self,
@@ -792,16 +767,16 @@ class BaseAsyncQuery(BaseQuery):
         is_updated = False
         if not set_none:
             data = {key: value for key, value in data.items() if value is not None}
-        for field, value in data.items():
+        for field_, value in data.items():
             if (
                 set_none
                 and value is None
-                and (allowed_none_fields != "*" and field not in allowed_none_fields)
+                and (allowed_none_fields != "*" and field_ not in allowed_none_fields)
             ):
                 continue
-            if not is_updated and getattr(item, field, None) != value:
+            if not is_updated and getattr(item, field_, None) != value:
                 is_updated = True
-            setattr(item, field, value)
+            setattr(item, field_, value)
         if use_flush:
             await self.session.flush()
         else:

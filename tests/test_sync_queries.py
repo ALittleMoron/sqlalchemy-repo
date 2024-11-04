@@ -33,7 +33,7 @@ def test_get_item(  # noqa: D103
     mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     db_item = query_obj.get_item(model=MyModel, filters=dict(id=item.id))
     assert db_item is not None, f"MyModel with id {item.id} not found in db."
     assert_compare_db_items(item, db_item)
@@ -44,7 +44,7 @@ def test_get_item_not_found(  # noqa: D103
     mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     db_item = query_obj.get_item(model=MyModel, filters=dict(id=item.id + 1))
     assert db_item is None, f"MyModel with id {item.id + 1} was found in db (but it shouldn't)."
 
@@ -57,7 +57,7 @@ def test_get_items_count(  # noqa: D103
     for _ in range(create_count):
         mymodel_sync_factory(db_sync_session, commit=False)
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     count = query_obj.get_items_count(model=MyModel)
     assert count == create_count
 
@@ -70,7 +70,7 @@ def test_get_items_count_with_filter(  # noqa: D103
     for _ in range(2):
         mymodel_sync_factory(db_sync_session, commit=False)
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     count = query_obj.get_items_count(model=MyModel, filters=dict(id=item.id))
     assert count == 1
 
@@ -81,7 +81,7 @@ def test_get_items_list(  # noqa: D103
 ) -> None:
     items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     db_items = list(query_obj.get_item_list(model=MyModel))
     assert_compare_db_item_list(items, db_items)
 
@@ -93,7 +93,7 @@ def test_get_items_list_with_unique(  # noqa: D103
 ) -> None:
     items = [mymodel_sync_factory(db_sync_session, commit=False) for _ in range(3)]
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     db_items = list(query_obj.get_item_list(model=MyModel, unique_items=True))
     assert_compare_db_item_list(items, db_items)
 
@@ -109,7 +109,7 @@ def test_db_create(
     db_sync_session: "Session",
     use_flush: bool,  # noqa: FBT001
 ) -> None:
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     create_data = {
         "name": text_faker.sentence(),
         "other_name": text_faker.sentence(),
@@ -138,7 +138,7 @@ def test_db_create_list(
     db_sync_session: "Session",
     use_flush: bool,  # noqa: FBT001
 ) -> None:
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     create_data = [
         {
             "name": text_faker.sentence(),
@@ -207,7 +207,7 @@ def test_db_update(
 ) -> None:
     for _ in range(items_count):
         mymodel_sync_factory(db_sync_session, commit=True)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     db_item = query_obj.db_update(model=MyModel, data=update_data, use_flush=use_flush)
     assert len(db_item) == items_count
     assert_compare_db_item_list_with_dict(db_item, update_data, skip_keys_check=True)
@@ -251,7 +251,7 @@ def test_change_item(
     expected_updated_flag: bool,  # noqa: FBT001
 ) -> None:
     item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     updated, db_item = query_obj.change_item(data=update_data, item=item, use_flush=use_flush)
     assert expected_updated_flag is updated
     assert_compare_db_item_with_dict(db_item, update_data, skip_keys_check=True)
@@ -300,7 +300,7 @@ def test_change_item_none_check(
     none_set_fields: set[str],
 ) -> None:
     item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     updated, db_item = query_obj.change_item(
         data=update_data,
         item=item,
@@ -319,7 +319,7 @@ def test_db_delete_direct_value(
     mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     item = mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     delete_count = query_obj.db_delete(
         model=MyModel,
         filters={"id": item.id},
@@ -338,7 +338,7 @@ def test_db_delete_multiple_values(
     to_delete_count = 3
     for _ in range(to_delete_count):
         mymodel_sync_factory(db_sync_session)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     delete_count = query_obj.db_delete(
         model=MyModel,
         use_flush=use_flush,
@@ -357,7 +357,7 @@ def test_disable_items_direct_value(
     mymodel_sync_factory: "SyncFactoryFunctionProtocol[MyModel]",
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, bl=False)
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     disable_count = query_obj.disable_items(
         model=MyModel,
         ids_to_disable={item.id},
@@ -383,7 +383,7 @@ def test_items_exists_success_any_item(  # noqa: D103
 ) -> None:
     mymodel_sync_factory(db_sync_session, commit=False)
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     exists = query_obj.items_exists(model=MyModel, filters=None)
     assert exists is True
 
@@ -394,13 +394,13 @@ def test_items_exists_success_direct_item(  # noqa: D103
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, commit=False)
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     exists = query_obj.items_exists(model=MyModel, filters={"id": item.id})
     assert exists is True
 
 
 def test_items_not_exists(db_sync_session: "Session") -> None:  # noqa: D103
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     exists = query_obj.items_exists(model=MyModel, filters=None)
     assert exists is False
 
@@ -411,6 +411,6 @@ def test_items_not_exists_direct_item(  # noqa: D103
 ) -> None:
     item = mymodel_sync_factory(db_sync_session, commit=False)
     db_sync_session.commit()
-    query_obj = BaseSyncQuery(db_sync_session, SimpleFilterConverter())
+    query_obj = BaseSyncQuery(session=db_sync_session, filter_converter=SimpleFilterConverter())
     exists = query_obj.items_exists(model=MyModel, filters={"id": -item.id})
     assert exists is False

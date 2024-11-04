@@ -135,7 +135,7 @@ venv = ".venv"
 
 [project]
 name = "sqlrepo"
-version = "5.4.1"
+version = "5.5.0"
 description = "sqlalchemy repositories with crud operations and other utils for it."
 authors = [{ name = "Dmitriy Lunev", email = "dima.lunev14@gmail.com" }]
 requires-python = ">=3.11"
