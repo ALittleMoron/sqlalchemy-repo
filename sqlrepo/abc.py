@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
     from collections.abc import Sequence
 
+    # noinspection PyUnresolvedReferences
     from sqlrepo.types import DataDict, Filters, Joins, Loads, OrderByParams, SearchByParams
 
 
@@ -60,7 +61,7 @@ class AbstractSyncListRepository(ABC, Generic[T]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[T]":
+    ) -> "list[T]":
         raise NotImplementedError
 
 
@@ -80,7 +81,7 @@ class AbstractSyncBulkCreateRepository(ABC, Generic[T]):
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[T]":
+    ) -> "list[T]":
         raise NotImplementedError
 
 
@@ -91,7 +92,7 @@ class AbstractSyncUpdateRepository(ABC, Generic[T]):
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[T] | None":
+    ) -> "list[T] | None":
         raise NotImplementedError
 
 
@@ -189,7 +190,7 @@ class AbstractAsyncListRepository(ABC, Generic[T]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[T]":
+    ) -> "list[T]":
         raise NotImplementedError
 
 
@@ -209,7 +210,7 @@ class AbstractAsyncBulkCreateRepository(ABC, Generic[T]):
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[T]":
+    ) -> "list[T]":
         raise NotImplementedError
 
 
@@ -220,7 +221,7 @@ class AbstractAsyncUpdateRepository(ABC, Generic[T]):
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[T] | None":
+    ) -> "list[T] | None":
         raise NotImplementedError
 
 

@@ -4,7 +4,7 @@ import datetime
 import re
 from collections.abc import Iterable
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 
 from dev_utils.common import get_utc_now
 from sqlalchemy import CursorResult, and_, delete, desc, exists, func, insert, or_, select, update
@@ -261,7 +261,7 @@ class BaseQuery:
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict | Sequence[DataDict | None] | None" = None,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Prepare items to create.
 
         Initialize model instances by given data.
@@ -410,7 +410,7 @@ class BaseSyncQuery(BaseQuery):
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model."""
         stmt = self._get_item_list_stmt(
             model=model,
@@ -425,8 +425,8 @@ class BaseSyncQuery(BaseQuery):
         )
         result = self.session.scalars(stmt)
         if unique_items:
-            return result.unique().all()
-        return result.all()
+            return cast("list[BaseSQLAlchemyModel]", result.unique().all())
+        return cast("list[BaseSQLAlchemyModel]", result.all())
 
     @overload
     def db_create(
@@ -444,7 +444,7 @@ class BaseSyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         data: "Sequence[DataDict]",
         use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     def db_create(
         self,
@@ -452,14 +452,14 @@ class BaseSyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict | Sequence[DataDict] | None" = None,
         use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+    ) -> "BaseSQLAlchemyModel | list[BaseSQLAlchemyModel]":
         """Insert data to given model by given data."""
         stmt = self._db_insert_stmt(model=model, data=data)
         if isinstance(data, dict) or data is None:
             result = self.session.scalar(stmt)
         else:
             result = self.session.scalars(stmt)
-            result = result.unique().all()
+            result = cast("list[BaseSQLAlchemyModel]", result.unique().all())
         if use_flush:
             self.session.flush()
         else:
@@ -476,7 +476,7 @@ class BaseSyncQuery(BaseQuery):
         data: "DataDict",
         filters: "Filters | None" = None,
         use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Update model from given data."""
         stmt = self._db_update_stmt(
             model=model,
@@ -488,7 +488,7 @@ class BaseSyncQuery(BaseQuery):
             self.session.flush()
         else:
             self.session.commit()
-        return result.unique().all()
+        return cast("list[BaseSQLAlchemyModel]", result.unique().all())
 
     def change_item(
         self,
@@ -696,7 +696,7 @@ class BaseAsyncQuery(BaseQuery):
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model."""
         stmt = self._get_item_list_stmt(
             model=model,
@@ -711,8 +711,8 @@ class BaseAsyncQuery(BaseQuery):
         )
         result = await self.session.scalars(stmt)
         if unique_items:
-            return result.unique().all()
-        return result.all()
+            return cast("list[BaseSQLAlchemyModel]", result.unique().all())
+        return cast("list[BaseSQLAlchemyModel]", result.all())
 
     @overload
     async def db_create(
@@ -730,7 +730,7 @@ class BaseAsyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         data: "Sequence[DataDict]",
         use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     async def db_create(
         self,
@@ -738,14 +738,14 @@ class BaseAsyncQuery(BaseQuery):
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict | Sequence[DataDict] | None" = None,
         use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
+    ) -> "BaseSQLAlchemyModel | list[BaseSQLAlchemyModel]":
         """Insert data to given model by given data."""
         stmt = self._db_insert_stmt(model=model, data=data)
         if isinstance(data, dict) or data is None:
             result = await self.session.scalar(stmt)
         else:
             result = await self.session.scalars(stmt)
-            result = result.unique().all()
+            result = cast("list[BaseSQLAlchemyModel]", result.unique().all())
         if use_flush:
             await self.session.flush()
         else:
@@ -762,7 +762,7 @@ class BaseAsyncQuery(BaseQuery):
         data: "DataDict",
         filters: "Filters | None" = None,
         use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Update model from given data."""
         stmt = self._db_update_stmt(
             model=model,
@@ -774,7 +774,7 @@ class BaseAsyncQuery(BaseQuery):
             await self.session.flush()
         else:
             await self.session.commit()
-        return result.unique().all()
+        return cast("list[BaseSQLAlchemyModel]", result.unique().all())
 
     async def change_item(
         self,

@@ -279,7 +279,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         with wrap_any_exception_manager():
             return await self.queries.get_item_list(
@@ -299,7 +299,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Create sequence model_class of instances from given data."""
         with wrap_any_exception_manager():
             return await self.queries.db_create(
@@ -324,7 +324,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
             return await self.queries.db_update(
@@ -460,7 +460,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         with wrap_any_exception_manager():
             return self.queries.get_item_list(
@@ -480,7 +480,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Create sequence model_class of instances from given data."""
         with wrap_any_exception_manager():
             return self.queries.db_create(
@@ -505,7 +505,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
             return self.queries.db_update(
@@ -611,7 +611,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         return await self._list(
             filters=filters,
@@ -636,7 +636,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Create sequence model_class of instances from given data."""
         return await self._bulk_create(data=data)
 
@@ -645,7 +645,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         return await self._update(data=data, filters=filters)
 
@@ -722,7 +722,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Get list of instances of model_class."""
         return self._list(
             filters=filters,
@@ -747,7 +747,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "Sequence[BaseSQLAlchemyModel]":
+    ) -> "list[BaseSQLAlchemyModel]":
         """Create sequence model_class of instances from given data."""
         return self._bulk_create(data=data)
 
@@ -756,7 +756,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "Sequence[BaseSQLAlchemyModel] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         return self._update(data=data, filters=filters)
 
