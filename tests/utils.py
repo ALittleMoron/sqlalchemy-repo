@@ -202,6 +202,10 @@ async def create_db_item_async(
     return item
 
 
+class NotModelClass:
+    pass
+
+
 class Base(DeclarativeBase):  # noqa: D101
     pass
 
@@ -218,11 +222,11 @@ class MyModel(Base):  # noqa: D101
 
     @hybrid_property
     def full_name(self):
-        return self.name + "" + self.other_name
+        return ((self.name or "") + "" + (self.other_name or "")).strip()
 
     @hybrid_method
     def get_full_name(self):
-        return self.name + "" + self.other_name
+        return ((self.name or "") + "" + (self.other_name or "")).strip()
 
 
 class OtherModel(Base):  # noqa: D101

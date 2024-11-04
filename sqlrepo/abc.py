@@ -1,39 +1,14 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Generic, NotRequired, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from sqlalchemy.orm import DeclarativeBase as Base
 
 if TYPE_CHECKING:
-
     # noinspection PyUnresolvedReferences
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
 
-    from sqlalchemy.orm.attributes import QueryableAttribute
-    from sqlalchemy.orm.strategy_options import (  # type: ignore[reportPrivateUsage]
-        _AbstractLoad as Load,
-    )
-    from sqlalchemy.sql._typing import (
-        _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
-    )
-    from sqlalchemy.sql.elements import ColumnElement
-
-    from sqlrepo.types import FilterType
-
-    class JoinKwargs(TypedDict):
-        """Kwargs for join."""
-
-        isouter: NotRequired[bool]
-        full: NotRequired[bool]
-
-    Model = type[Base]
-    JoinClause = ColumnElement[bool]
-    ModelWithOnclause = tuple[Model, JoinClause]
-    CompleteModel = tuple[Model, JoinClause, JoinKwargs]
-    Join = str | Model | ModelWithOnclause | CompleteModel
-    SearchParam = str | QueryableAttribute[Any]
-    OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
-    DataDict = dict[str, Any]
+    from sqlrepo.types import DataDict, Filters, Joins, Loads, OrderByParams, SearchByParams
 
 
 T = TypeVar("T", bound=Base)
@@ -44,9 +19,9 @@ class AbstractSyncGetRepository(ABC, Generic[T]):
     def get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> T | None:
         raise NotImplementedError
 
@@ -56,8 +31,8 @@ class AbstractSyncCountRepository(ABC):
     def count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         raise NotImplementedError
 
@@ -67,7 +42,7 @@ class AbstractSyncExistsRepository(ABC):
     def exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         raise NotImplementedError
 
@@ -77,12 +52,12 @@ class AbstractSyncListRepository(ABC, Generic[T]):
     def list(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[T]":
@@ -115,7 +90,7 @@ class AbstractSyncUpdateRepository(ABC, Generic[T]):
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[T] | None":
         raise NotImplementedError
 
@@ -136,7 +111,7 @@ class AbstractSyncDeleteRepository(ABC):
     def delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         raise NotImplementedError
 
@@ -147,7 +122,7 @@ class AbstractSyncDisableRepository(ABC):
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> int:
         raise NotImplementedError
 
@@ -173,9 +148,9 @@ class AbstractAsyncGetRepository(ABC, Generic[T]):
     async def get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> T | None:
         raise NotImplementedError
 
@@ -185,8 +160,8 @@ class AbstractAsyncCountRepository(ABC):
     async def count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         raise NotImplementedError
 
@@ -196,7 +171,7 @@ class AbstractAsyncExistsRepository(ABC):
     async def exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         raise NotImplementedError
 
@@ -206,12 +181,12 @@ class AbstractAsyncListRepository(ABC, Generic[T]):
     async def list(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[T]":
@@ -244,7 +219,7 @@ class AbstractAsyncUpdateRepository(ABC, Generic[T]):
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[T] | None":
         raise NotImplementedError
 
@@ -265,7 +240,7 @@ class AbstractAsyncDeleteRepository(ABC):
     async def delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         raise NotImplementedError
 
@@ -276,7 +251,7 @@ class AbstractAsyncDisableRepository(ABC):
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> int:
         raise NotImplementedError
 

@@ -1,25 +1,24 @@
 import datetime
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Final, Literal, TypeAlias
+from typing import TYPE_CHECKING, Final, Literal
 
 from sqlalchemy_filter_converter import (
-    AdvancedOperatorFilterConverter,
+    AdvancedFilterConverter,
     BaseFilterConverter,
     DjangoLikeFilterConverter,
     SimpleFilterConverter,
 )
 from sqlalchemy_filter_converter.types import FilterConverterStrategiesLiteral
 
-StrField: TypeAlias = str
-
-
 if TYPE_CHECKING:
-    from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
+
+    # noinspection PyUnresolvedReferences
+    from sqlrepo.types import DisableField, DisableIdField, SpecificColumnMapping, StrField
 
 
 filter_convert_classes: Final[dict[FilterConverterStrategiesLiteral, type[BaseFilterConverter]]] = {
     "simple": SimpleFilterConverter,
-    "advanced": AdvancedOperatorFilterConverter,
+    "advanced": AdvancedFilterConverter,
     "django": DjangoLikeFilterConverter,
 }
 """Convert class filters mapping."""
@@ -30,7 +29,7 @@ class RepositoryConfig:
     """Repository config as dataclass."""
 
     # TODO: add specific_column_mapping to filters, joins and loads.
-    specific_column_mapping: "dict[str, QueryableAttribute[Any]]" = field(default_factory=dict)
+    specific_column_mapping: "SpecificColumnMapping" = field(default_factory=dict)
     """
     Warning! Current version of sqlrepo doesn't support this mapping for filters, joins and loads.
 
@@ -91,7 +90,7 @@ class RepositoryConfig:
     implementation of disable_field. If None and ``disable`` method was evaluated, there will be
     RepositoryAttributeError exception raised by Repository class.
     """
-    disable_field: "InstrumentedAttribute[Any] | StrField | None" = field(default=None)
+    disable_field: "DisableField | None" = field(default=None)
     """
     Uses as choice of used defined disable field.
 
@@ -99,7 +98,7 @@ class RepositoryConfig:
     implementation of disable_field. If None and ``disable`` method was evaluated, there will be
     RepositoryAttributeError exception raised by Repository class.
     """
-    disable_id_field: "InstrumentedAttribute[Any] |StrField | None" = field(default=None)
+    disable_id_field: "DisableIdField | None" = field(default=None)
     """
     Uses as choice of used defined id field in model, which supports disable.
 
@@ -138,6 +137,8 @@ class RepositoryConfig:
         more info.
     """
 
-    def get_filter_convert_class(self) -> type[BaseFilterConverter]:
+    def get_filter_convert(self) -> BaseFilterConverter:
         """Get filter convert class from passed strategy."""
-        return filter_convert_classes[self.filter_convert_strategy]
+        return filter_convert_classes[self.filter_convert_strategy](
+            specific_column_mapping=self.specific_column_mapping,
+        )

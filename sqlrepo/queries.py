@@ -3,59 +3,56 @@
 import datetime
 import re
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, TypeVar, overload
+from inspect import isclass
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, overload
 
 from dev_utils.common import get_utc_now
 from sqlalchemy import CursorResult, and_, delete, desc, exists, func, insert, or_, select, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy_dev_utils import apply_joins, get_sqlalchemy_attribute, is_queryable_attribute
+from sqlalchemy.orm import DeclarativeBase as Base
+from sqlalchemy_dev_utils import (
+    apply_joins,
+    get_sqlalchemy_attribute,
+    is_declarative_class,
+    is_queryable_attribute,
+)
 from sqlalchemy_filter_converter import BaseFilterConverter
 
 from sqlrepo.exc import QueryError
 from sqlrepo.logger import default_logger
 
-
-class JoinKwargs(TypedDict):
-    """Kwargs for join statement."""
-
-    isouter: NotRequired[bool]
-    full: NotRequired[bool]
-
+# noinspection PyUnresolvedReferences
+from sqlrepo.types import (
+    Count,
+    DataDict,
+    Deleted,
+    Filters,
+    IsUpdated,
+    JoinKwargs,
+    Joins,
+    Loads,
+    LoggerProtocol,
+    Model,
+    OrderByParams,
+    SearchByParam,
+    SearchByParams,
+    SpecificColumnMapping,
+    StrField,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm import DeclarativeBase as Base
     from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
     from sqlalchemy.orm.session import Session
-    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
-    from sqlalchemy.sql._typing import (
-        _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
-    )
     from sqlalchemy.sql.dml import Delete, ReturningInsert, ReturningUpdate, Update
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
 
-    # noinspection PyUnresolvedReferences
-    from sqlrepo.types import FilterType, LoggerProtocol
 
-    BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
-    T = TypeVar("T")
-    Count = int
-    Deleted = bool
-    Updated = bool
-    Model = type[Base]
-    JoinClause = ColumnElement[bool]
-    ModelWithOnclause = tuple[Model, JoinClause]
-    CompleteModel = tuple[Model, JoinClause, JoinKwargs]
-    Join = str | Model | ModelWithOnclause | CompleteModel
-    Load = _AbstractLoad
-    SearchParam = str | QueryableAttribute[Any]
-    ColumnParam = str | QueryableAttribute[Any]
-    OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
-    DataDict = dict[str, Any]
-    StrField = str
+BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
+T = TypeVar("T")
 
 
 class BaseQuery:
@@ -66,12 +63,12 @@ class BaseQuery:
 
     def __init__(
         self,
-        filter_converter_class: type[BaseFilterConverter],
-        specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
+        filter_converter: BaseFilterConverter,
+        specific_column_mapping: "SpecificColumnMapping | None" = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.specific_column_mapping = specific_column_mapping
-        self.filter_converter_class = filter_converter_class
+        self.filter_converter = filter_converter
         self.logger = logger
 
     def _resolve_specific_columns(
@@ -109,15 +106,20 @@ class BaseQuery:
         self,
         *,
         stmt: "Select[tuple[T]]",
-        joins: "Sequence[Join]",
+        joins: "Joins",
     ) -> "Select[tuple[T]]":
         """Resolve joins from strings."""
-        # FIX: may cause situation, when user passed Join as tuple may cause error.
-        # (Model, Model.id == OtherModel.model_id)  # noqa: ERA001
-        # or
-        # (Model, Model.id == OtherModel.model_id, {"isouter": True})  # noqa: ERA001
+        if is_declarative_class(joins):
+            return stmt.join(joins)
         if isinstance(joins, str):
-            joins = [joins]
+            return apply_joins(stmt, joins)
+        if isclass(joins):
+            msg = (
+                f'Parameter "joins" should not contains non-declarative model classes. '
+                f'{joins} was passed'
+            )
+            self.logger.exception(msg)
+            raise QueryError(msg)
         for join in joins:
             if isinstance(join, tuple | list):
                 target, clause, *kw_list = join
@@ -138,7 +140,7 @@ class BaseQuery:
         disable_field: "QueryableAttribute[Any]",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> list["ColumnElement[bool]"]:
         """Generate disable filters from given data."""
         filters: list["ColumnElement[bool]"] = [id_field.in_(ids_to_disable)]
@@ -147,7 +149,7 @@ class BaseQuery:
         elif allow_filter_by_value and field_type == datetime.datetime:
             filters.append(disable_field.is_(None))
         if extra_filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, extra_filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, extra_filters)
             filters.extend(sqlalchemy_filters)
         return filters
 
@@ -155,7 +157,7 @@ class BaseQuery:
         self,
         search: str,
         model: type["BaseSQLAlchemyModel"],
-        *search_by_args: "SearchParam",
+        *search_by_args: "SearchByParam",
         use_and_clause: bool = False,
         case_insensitive: bool = True,
     ) -> "ColumnElement[bool]":
@@ -179,18 +181,19 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "Select[tuple[BaseSQLAlchemyModel]]":
         """Generate SQLAlchemy stmt to get one item from filters, joins and loads."""
         stmt = select(model)
         if joins is not None:
             stmt = self._resolve_and_apply_joins(stmt=stmt, joins=joins)
         if loads is not None:
-            stmt = stmt.options(*loads)
+            loads_to_apply = [loads] if not isinstance(loads, list | tuple) else loads
+            stmt = stmt.options(*loads_to_apply)
         if filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
         return stmt
 
@@ -198,15 +201,15 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Select[tuple[int]]":
         """Generate SQLAlchemy stmt to get count of items from filters and joins."""
         stmt = select(func.count()).select_from(model)
         if joins is not None:
             stmt = self._resolve_and_apply_joins(stmt=stmt, joins=joins)
         if filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
         return stmt
 
@@ -214,12 +217,12 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
+        filters: "Filters | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Select[tuple[BaseSQLAlchemyModel]]":
@@ -272,12 +275,12 @@ class BaseQuery:
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "ReturningUpdate[tuple[BaseSQLAlchemyModel]]":
         """Generate SQLAlchemy stmt to update items with given data."""
         stmt = update(model)
         if filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
         return stmt.values(**data).returning(model)
 
@@ -285,12 +288,12 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Delete":
         """Generate SQLAlchemy stmt to delete items with given data."""
         stmt = delete(model)
         if filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, filters)
             stmt = stmt.where(*sqlalchemy_filters)
         return stmt
 
@@ -303,7 +306,7 @@ class BaseQuery:
         disable_field: "InstrumentedAttribute[Any]",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> "Update":
         """Generate SQLAlchemy stmt to disable items with given data."""
         if not issubclass(field_type, datetime.datetime | bool):
@@ -330,12 +333,12 @@ class BaseQuery:
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Select[tuple[bool]]":
         """Generate SQLAlchemy stmt to check items for exist in database."""
         exist_stmt = exists().select_from(model)
         if filters is not None:
-            sqlalchemy_filters = self.filter_converter_class.convert(model, filters)
+            sqlalchemy_filters = self.filter_converter.convert(model, filters)
             exist_stmt = exist_stmt.where(*sqlalchemy_filters)
         return select(exist_stmt)
 
@@ -346,13 +349,13 @@ class BaseSyncQuery(BaseQuery):
     def __init__(
         self,
         session: "Session",
-        filter_converter_class: type[BaseFilterConverter],
+        filter_converter: BaseFilterConverter,
         specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session
         super().__init__(
-            filter_converter_class=filter_converter_class,
+            filter_converter=filter_converter,
             specific_column_mapping=specific_column_mapping,
             logger=logger,
         )
@@ -361,9 +364,9 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model by given filters."""
         stmt = self._get_item_stmt(
@@ -379,8 +382,8 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
@@ -398,12 +401,12 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
+        filters: "Filters | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
@@ -466,54 +469,12 @@ class BaseSyncQuery(BaseQuery):
             raise QueryError(msg)
         return result
 
-    @overload
-    def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "DataDict | None",
-        use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel": ...
-
-    @overload
-    def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "Sequence[DataDict | None]",
-        use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "DataDict | Sequence[DataDict | None] | None" = None,
-        use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
-        """Create model instance from given data."""
-        items = self._prepare_create_items(model=model, data=data)
-        self.session.add_all(items)
-        if use_flush:
-            self.session.flush()
-        else:
-            self.session.commit()
-
-        msg = (
-            f"Create row in database. Item: {items}. "
-            f"{'Flush used.' if use_flush else 'Commit used.'}."
-        )
-        self.logger.info(msg)
-        if len(items) == 1:
-            return items[0]
-        return items
-
     def db_update(
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Update model from given data."""
@@ -537,7 +498,7 @@ class BaseSyncQuery(BaseQuery):
         set_none: bool = False,
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
         use_flush: bool = False,
-    ) -> "tuple[Updated, BaseSQLAlchemyModel]":
+    ) -> "tuple[IsUpdated, BaseSQLAlchemyModel]":
         """Update model instance from given data.
 
         Returns tuple with boolean (was instance updated or not) and updated instance.
@@ -570,7 +531,7 @@ class BaseSyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Delete model in db by given filters."""
@@ -622,7 +583,7 @@ class BaseSyncQuery(BaseQuery):
         disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Disable model instances with given ids and extra_filters."""
@@ -660,7 +621,7 @@ class BaseSyncQuery(BaseQuery):
     def items_exists(
         self,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         stmt = self._exists_items_stmt(model=model, filters=filters)
@@ -674,13 +635,13 @@ class BaseAsyncQuery(BaseQuery):
     def __init__(
         self,
         session: "AsyncSession",
-        filter_converter_class: type[BaseFilterConverter],
+        filter_converter: BaseFilterConverter,
         specific_column_mapping: dict[str, "QueryableAttribute[Any]"] | None = None,
         logger: "LoggerProtocol" = default_logger,
     ) -> None:
         self.session = session
         super().__init__(
-            filter_converter_class=filter_converter_class,
+            filter_converter=filter_converter,
             specific_column_mapping=specific_column_mapping,
             logger=logger,
         )
@@ -689,9 +650,9 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model by given filters."""
         stmt = self._get_item_stmt(
@@ -707,8 +668,8 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         """Get count of instances of model by given filters."""
         stmt = self._get_items_count_stmt(
@@ -726,12 +687,12 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
+        filters: "Filters | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
@@ -794,54 +755,12 @@ class BaseAsyncQuery(BaseQuery):
             raise QueryError(msg)
         return result
 
-    @overload
-    async def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "DataDict | None",
-        use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel": ...
-
-    @overload
-    async def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "Sequence[DataDict | None]",
-        use_flush: bool = False,
-    ) -> "Sequence[BaseSQLAlchemyModel]": ...
-
-    async def create_item(
-        self,
-        *,
-        model: type["BaseSQLAlchemyModel"],
-        data: "DataDict | Sequence[DataDict | None] | None" = None,
-        use_flush: bool = False,
-    ) -> "BaseSQLAlchemyModel | Sequence[BaseSQLAlchemyModel]":
-        """Create model instance from given data."""
-        items = self._prepare_create_items(model=model, data=data)
-        self.session.add_all(items)
-        if use_flush:
-            await self.session.flush()
-        else:
-            await self.session.commit()
-
-        msg = (
-            f"Create row in database. Items: {items}. "
-            f"{'Flush used.' if use_flush else 'Commit used.'}."
-        )
-        self.logger.info(msg)
-        if len(items) == 1:
-            return items[0]
-        return items
-
     async def db_update(
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Sequence[BaseSQLAlchemyModel]":
         """Update model from given data."""
@@ -898,7 +817,7 @@ class BaseAsyncQuery(BaseQuery):
         self,
         *,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Delete model in db by given filters."""
@@ -950,7 +869,7 @@ class BaseAsyncQuery(BaseQuery):
         disable_field: "InstrumentedAttribute[Any] | StrField",
         field_type: type[datetime.datetime] | type[bool] = datetime.datetime,
         allow_filter_by_value: bool = True,
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> "Count":
         """Disable model instances with given ids and extra_filters."""
@@ -988,7 +907,7 @@ class BaseAsyncQuery(BaseQuery):
     async def items_exists(
         self,
         model: type["BaseSQLAlchemyModel"],
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         stmt = self._exists_items_stmt(model=model, filters=filters)

@@ -5,7 +5,7 @@
 groups = ["default", "dev", "fastapi"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:29f8f9126eeabc2edb60e11ea0d718bd9568a9b113a5e7b3eee1d733964e290f"
+content_hash = "sha256:0236f1e351a31a7dccf72ca643b678d2532e2655702cb6b7f084271227e65daa"
 
 [[metadata.targets]]
 requires_python = ">=3.11"
@@ -1034,7 +1034,7 @@ files = [
 
 [[package]]
 name = "sqlalchemy-dev-utils"
-version = "1.1.0"
+version = "1.3.0"
 requires_python = ">=3.11"
 summary = "My sqlalchemy utils package, that I use in my projects."
 groups = ["default"]
@@ -1043,24 +1043,24 @@ dependencies = [
     "sqlalchemy>=2.0",
 ]
 files = [
-    {file = "sqlalchemy_dev_utils-1.1.0-py3-none-any.whl", hash = "sha256:d2e01934ff6b51eeb8b6faa03fcfdbafba90afbac5c64d645677e514b02d59b5"},
-    {file = "sqlalchemy_dev_utils-1.1.0.tar.gz", hash = "sha256:09a4dfb9fd1001bc094b1a7dd7cb11cb6fbb94c6e3e01fa783a224caaade0276"},
+    {file = "sqlalchemy_dev_utils-1.3.0-py3-none-any.whl", hash = "sha256:12bbb642f6170e6bb10087ed8ecba630b3342d20823025c8780616dec8907c0c"},
+    {file = "sqlalchemy_dev_utils-1.3.0.tar.gz", hash = "sha256:7c8d6a4afd3b68220dc8581f338cf9054841222ef71a0b469c60d837e5ab4ac2"},
 ]
 
 [[package]]
 name = "sqlalchemy-filter-converter"
-version = "1.3.1"
+version = "1.4.0"
 requires_python = ">=3.11"
 summary = "SQLAlchemy filter converters."
 groups = ["default"]
 dependencies = [
-    "python-dev-utils==7.0.1",
-    "sqlalchemy-dev-utils==1.1.0",
+    "python-dev-utils>=7.0.1",
+    "sqlalchemy-dev-utils>=1.2.0",
     "sqlalchemy>=2.0",
 ]
 files = [
-    {file = "sqlalchemy_filter_converter-1.3.1-py3-none-any.whl", hash = "sha256:da942d0b0203b007257d9036187994cccda72d99deff2499a35204107398be5f"},
-    {file = "sqlalchemy_filter_converter-1.3.1.tar.gz", hash = "sha256:8f2f3b1825d32600ef351a559894e9d07f9c85f087976be577da0ef504c88597"},
+    {file = "sqlalchemy_filter_converter-1.4.0-py3-none-any.whl", hash = "sha256:a8b121b0959d0b664a4e48809ee169a840949866bf637554add9ff2496a05ef2"},
+    {file = "sqlalchemy_filter_converter-1.4.0.tar.gz", hash = "sha256:274fdc7fb8ddde701e9694389cace9249be7ed9a302899c2265a143319f115a3"},
 ]
 
 [[package]]

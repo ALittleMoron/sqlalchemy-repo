@@ -8,9 +8,6 @@ from typing import (
     Any,
     ForwardRef,
     Generic,
-    NotRequired,
-    TypeAlias,
-    TypedDict,
     TypeVar,
     get_args,
 )
@@ -38,41 +35,26 @@ from sqlrepo.wrappers import wrap_any_exception_manager
 
 if TYPE_CHECKING:
     # noinspection PyUnresolvedReferences
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
 
     from sqlalchemy.ext.asyncio import AsyncSession
-    from sqlalchemy.orm.attributes import QueryableAttribute
     from sqlalchemy.orm.session import Session
-    from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
-    from sqlalchemy.sql._typing import (
-        _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
+
+    # noinspection PyUnresolvedReferences
+    from sqlrepo.types import (
+        Count,
+        DataDict,
+        Filters,
+        IsUpdated,
+        Joins,
+        Loads,
+        LoggerProtocol,
+        OrderByParams,
+        SearchByParams,
     )
-    from sqlalchemy.sql.elements import ColumnElement
-
-    from sqlrepo.types import FilterType, LoggerProtocol
-
-    class JoinKwargs(TypedDict):
-        """Kwargs for join."""
-
-        isouter: NotRequired[bool]
-        full: NotRequired[bool]
-
-    Count = int
-    Deleted = bool
-    Model = type[Base]
-    JoinClause = ColumnElement[bool]
-    ModelWithOnclause = tuple[Model, JoinClause]
-    CompleteModel = tuple[Model, JoinClause, JoinKwargs]
-    Join = str | Model | ModelWithOnclause | CompleteModel
-    Load = _AbstractLoad
-    SearchParam = str | QueryableAttribute[Any]
-    OrderByParam = _ColumnExpressionOrStrLabelArgument[Any]
-    DataDict = dict[str, Any]
 
 
-StrField: TypeAlias = str
 BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
-IsUpdated: TypeAlias = bool
 
 
 def extract_model_from_generic(cls: type[Any]) -> "type[Base] | None":  # noqa: PLR0911 PLR0912 C901
@@ -239,7 +221,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self.logger = logger
         self.queries = self.query_class(
             session=session,
-            filter_converter_class=self.config.get_filter_convert_class(),
+            filter_converter=self.config.get_filter_convert(),
             specific_column_mapping=self.config.specific_column_mapping,
             logger=logger,
         )
@@ -247,9 +229,9 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         with wrap_any_exception_manager():
@@ -263,8 +245,8 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         """Get count of instances of model_class by given filters."""
         with wrap_any_exception_manager():
@@ -277,7 +259,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         with wrap_any_exception_manager():
@@ -289,12 +271,12 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _list(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
@@ -341,7 +323,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
@@ -374,7 +356,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     async def _delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         with wrap_any_exception_manager():
@@ -388,7 +370,7 @@ class BaseAsyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> "Count":
         """Disable model_class instances with given ids and extra_filters."""
         with wrap_any_exception_manager():
@@ -420,7 +402,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self.logger = logger
         self.queries = self.query_class(
             session=session,
-            filter_converter_class=self.config.get_filter_convert_class(),
+            filter_converter=self.config.get_filter_convert(),
             specific_column_mapping=self.config.specific_column_mapping,
             logger=logger,
         )
@@ -428,9 +410,9 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         with wrap_any_exception_manager():
@@ -444,8 +426,8 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         """Get count of instances of model_class by given filters."""
         with wrap_any_exception_manager():
@@ -458,7 +440,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         with wrap_any_exception_manager():
@@ -470,12 +452,12 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _list(
         self,
         *,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
-        filters: "FilterType | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
+        filters: "Filters | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
@@ -522,7 +504,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         with wrap_any_exception_manager():
@@ -555,7 +537,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
     def _delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Count":
         """Delete model_class in db by given filters."""
         with wrap_any_exception_manager():
@@ -569,7 +551,7 @@ class BaseSyncRepository(BaseRepository[BaseSQLAlchemyModel]):
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> "Count":
         """Disable model_class instances with given ids and extra_filters."""
         with wrap_any_exception_manager():
@@ -594,9 +576,9 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
     async def get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         return await self._get(filters=filters, joins=joins, loads=loads)
@@ -604,8 +586,8 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
     async def count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         """Get count of instances of model_class by given filters."""
         return await self._count(filters=filters, joins=joins)
@@ -613,7 +595,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
     async def exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         return await self._exists(filters=filters)
@@ -621,12 +603,12 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
     async def list(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
@@ -662,7 +644,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         return await self._update(data=data, filters=filters)
@@ -682,7 +664,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
     async def delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         """Delete model_class in db by given filters."""
         return await self._delete(filters=filters)
@@ -691,7 +673,7 @@ class AsyncRepository(BaseAsyncRepository[BaseSQLAlchemyModel], AbstractAsyncRep
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> int:
         """Disable model_class instances with given ids and extra_filters."""
         return await self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)
@@ -705,9 +687,9 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
     def get(
         self,
         *,
-        filters: "FilterType",
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters",
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
     ) -> "BaseSQLAlchemyModel | None":
         """Get one instance of model_class by given filters."""
         return self._get(filters=filters, joins=joins, loads=loads)
@@ -715,8 +697,8 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
     def count(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
     ) -> int:
         """Get count of instances of model_class by given filters."""
         return self._count(filters=filters, joins=joins)
@@ -724,7 +706,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
     def exists(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> bool:
         """Check rows in table for existing."""
         return self._exists(filters=filters)
@@ -732,12 +714,12 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
     def list(
         self,
         *,
-        filters: "FilterType | None" = None,
-        joins: "Sequence[Join] | None" = None,
-        loads: "Sequence[Load] | None" = None,
+        filters: "Filters | None" = None,
+        joins: "Joins | None" = None,
+        loads: "Loads | None" = None,
         search: str | None = None,
-        search_by: "SearchParam | Iterable[SearchParam] | None" = None,
-        order_by: "OrderByParam | Iterable[OrderByParam] | None" = None,
+        search_by: "SearchByParams | None" = None,
+        order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
     ) -> "Sequence[BaseSQLAlchemyModel]":
@@ -773,7 +755,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
         self,
         *,
         data: "DataDict",
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> "Sequence[BaseSQLAlchemyModel] | None":
         """Update model_class from given data."""
         return self._update(data=data, filters=filters)
@@ -793,7 +775,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
     def delete(
         self,
         *,
-        filters: "FilterType | None" = None,
+        filters: "Filters | None" = None,
     ) -> int:
         """Delete model_class in db by given filters."""
         return self._delete(filters=filters)
@@ -802,7 +784,7 @@ class SyncRepository(BaseSyncRepository[BaseSQLAlchemyModel], AbstractSyncReposi
         self,
         *,
         ids_to_disable: set[Any],
-        extra_filters: "FilterType | None" = None,
+        extra_filters: "Filters | None" = None,
     ) -> int:
         """Disable model_class instances with given ids and extra_filters."""
         return self._disable(ids_to_disable=ids_to_disable, extra_filters=extra_filters)

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import pytest
 from sqlalchemy_filter_converter import (
-    AdvancedOperatorFilterConverter,
+    AdvancedFilterConverter,
     DjangoLikeFilterConverter,
     SimpleFilterConverter,
 )
@@ -47,7 +47,7 @@ def test_validate_disable_attributes_raise_error() -> None:
     ("strategy", "expected_class"),
     [
         ("simple", SimpleFilterConverter),
-        ("advanced", AdvancedOperatorFilterConverter),
+        ("advanced", AdvancedFilterConverter),
         ("django", DjangoLikeFilterConverter),
     ],
 )
@@ -58,4 +58,4 @@ def test_get_filter_convert_class(
     class CorrectRepo(BaseRepository[MyModel]):
         config = RepositoryConfig(filter_convert_strategy=strategy)
 
-    assert CorrectRepo.config.get_filter_convert_class() == expected_class
+    assert isinstance(CorrectRepo.config.get_filter_convert(), expected_class)
