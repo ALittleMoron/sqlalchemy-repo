@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, Any, NotRequired, Protocol, TypeAlias, TypedDict, TypeVar
+
+from sqlalchemy.orm.decl_api import DeclarativeBase as Base
 
 if TYPE_CHECKING:
     from sqlalchemy import ColumnElement
     from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
-    from sqlalchemy.orm.decl_api import DeclarativeBase
     from sqlalchemy.orm.strategy_options import _AbstractLoad  # type: ignore[reportPrivateUsage]
     from sqlalchemy.sql._typing import (
         _ColumnExpressionOrStrLabelArgument,  # type: ignore[reportPrivateUsage]
@@ -28,6 +29,8 @@ class JoinKwargs(TypedDict):
     full: NotRequired[bool]
 
 
+BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
+
 Count: TypeAlias = int
 Deleted: TypeAlias = bool
 IsUpdated: TypeAlias = bool
@@ -40,7 +43,7 @@ SpecificColumnMapping: TypeAlias = "dict[str, QueryableAttribute[Any]]"
 Filter: TypeAlias = "dict[str, Any] | ColumnElement[bool]"
 Filters: TypeAlias = "Filter | tuple[Filter, ...] | list[Filter]"
 
-Model: TypeAlias = "type[DeclarativeBase]"
+Model: TypeAlias = "type[Base]"
 JoinClause: TypeAlias = "ColumnElement[bool]"
 JoinClauseWithModel: TypeAlias = "tuple[Model, JoinClause]"
 CompleteJoinClause: TypeAlias = "tuple[Model, JoinClause, JoinKwargs]"

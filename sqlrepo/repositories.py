@@ -31,6 +31,7 @@ from sqlrepo.constants import (
 )
 from sqlrepo.logger import RepositoryModelClassIncorrectUseWarning, default_logger
 from sqlrepo.queries import BaseAsyncQuery, BaseSyncQuery
+from sqlrepo.types import BaseSQLAlchemyModel
 from sqlrepo.wrappers import wrap_any_exception_manager
 
 if TYPE_CHECKING:
@@ -52,9 +53,6 @@ if TYPE_CHECKING:
         OrderByParams,
         SearchByParams,
     )
-
-
-BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
 
 
 def extract_model_from_generic(cls: type[Any]) -> "type[Base] | None":  # noqa: PLR0911 PLR0912 C901

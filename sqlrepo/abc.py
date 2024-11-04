@@ -1,28 +1,24 @@
 import datetime
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal
 
-from sqlalchemy.orm import DeclarativeBase as Base
+# noinspection PyUnresolvedReferences
+from sqlrepo.types import (
+    BaseSQLAlchemyModel,
+    DataDict,
+    DisableField,
+    DisableIdField,
+    Filters,
+    Joins,
+    Loads,
+    OrderByParams,
+    SearchByParams,
+)
 
 if TYPE_CHECKING:
-    # noinspection PyUnresolvedReferences
     from collections.abc import Sequence
 
-    # noinspection PyUnresolvedReferences
-    from sqlrepo.types import (
-        DataDict,
-        DisableField,
-        DisableIdField,
-        Filters,
-        Joins,
-        Loads,
-        OrderByParams,
-        SearchByParams,
-    )
-
-
-T = TypeVar("T", bound=Base)
+    from sqlalchemy.orm.decl_api import DeclarativeBase as Base
 
 
 class AbstractSyncQuery(ABC):
@@ -30,17 +26,17 @@ class AbstractSyncQuery(ABC):
     def get_item(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
-    ) -> "T | None": ...
+    ) -> "BaseSQLAlchemyModel | None": ...
 
     @abstractmethod
     def get_items_count(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         joins: "Joins | None" = None,
         filters: "Filters | None" = None,
     ) -> int: ...
@@ -49,7 +45,7 @@ class AbstractSyncQuery(ABC):
     def get_item_list(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
         filters: "Filters | None" = None,
@@ -59,43 +55,43 @@ class AbstractSyncQuery(ABC):
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
-    ) -> "list[T]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     def db_create(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         data: "DataDict | Sequence[DataDict] | None" = None,
         use_flush: bool = False,
-    ) -> "T | list[T]": ...
+    ) -> "BaseSQLAlchemyModel | list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     def db_update(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
         filters: "Filters | None" = None,
         use_flush: bool = False,
-    ) -> "list[T]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     def change_item(
         self,
         *,
         data: "DataDict",
-        item: "T",
+        item: "BaseSQLAlchemyModel",
         set_none: bool = False,
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
         use_flush: bool = False,
-    ) -> "tuple[bool, T]": ...
+    ) -> "tuple[bool, BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     def db_delete(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> int: ...
@@ -112,7 +108,7 @@ class AbstractSyncQuery(ABC):
     def disable_items(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
         id_field: "DisableIdField",
         disable_field: "DisableField",
@@ -125,7 +121,7 @@ class AbstractSyncQuery(ABC):
     @abstractmethod
     def items_exists(
         self,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
     ) -> bool: ...
 
@@ -135,17 +131,17 @@ class AbstractAsyncQuery(ABC):
     async def get_item(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
-    ) -> "T | None": ...
+    ) -> "BaseSQLAlchemyModel | None": ...
 
     @abstractmethod
     async def get_items_count(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         joins: "Joins | None" = None,
         filters: "Filters | None" = None,
     ) -> int: ...
@@ -154,7 +150,7 @@ class AbstractAsyncQuery(ABC):
     async def get_item_list(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
         filters: "Filters | None" = None,
@@ -164,43 +160,43 @@ class AbstractAsyncQuery(ABC):
         limit: int | None = None,
         offset: int | None = None,
         unique_items: bool = False,
-    ) -> "list[T]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     async def db_create(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         data: "DataDict | Sequence[DataDict] | None" = None,
         use_flush: bool = False,
-    ) -> "T | list[T]": ...
+    ) -> "BaseSQLAlchemyModel | list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     async def db_update(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         data: "DataDict",
         filters: "Filters | None" = None,
         use_flush: bool = False,
-    ) -> "list[T]": ...
+    ) -> "list[BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     async def change_item(
         self,
         *,
         data: "DataDict",
-        item: "T",
+        item: "BaseSQLAlchemyModel",
         set_none: bool = False,
         allowed_none_fields: 'Literal["*"] | set[str]' = "*",
         use_flush: bool = False,
-    ) -> "tuple[bool, T]": ...
+    ) -> "tuple[bool, BaseSQLAlchemyModel]": ...
 
     @abstractmethod
     async def db_delete(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
         use_flush: bool = False,
     ) -> int: ...
@@ -217,7 +213,7 @@ class AbstractAsyncQuery(ABC):
     async def disable_items(
         self,
         *,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         ids_to_disable: set[Any],
         id_field: "DisableIdField",
         disable_field: "DisableField",
@@ -230,12 +226,12 @@ class AbstractAsyncQuery(ABC):
     @abstractmethod
     async def items_exists(
         self,
-        model: type[T],
+        model: type["BaseSQLAlchemyModel"],
         filters: "Filters | None" = None,
     ) -> bool: ...
 
 
-class AbstractSyncGetRepository(ABC, Generic[T]):
+class AbstractSyncGetRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def get(
         self,
@@ -243,7 +239,7 @@ class AbstractSyncGetRepository(ABC, Generic[T]):
         filters: "Filters",
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
-    ) -> T | None:
+    ) -> BaseSQLAlchemyModel | None:
         raise NotImplementedError
 
 
@@ -268,7 +264,7 @@ class AbstractSyncExistsRepository(ABC):
         raise NotImplementedError
 
 
-class AbstractSyncListRepository(ABC, Generic[T]):
+class AbstractSyncListRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def list(
         self,
@@ -281,49 +277,49 @@ class AbstractSyncListRepository(ABC, Generic[T]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "list[T]":
+    ) -> "list[BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 
-class AbstractSyncCreateRepository(ABC, Generic[T]):
+class AbstractSyncCreateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def create(
         self,
         *,
         data: "DataDict | None",
-    ) -> T:
+    ) -> BaseSQLAlchemyModel:
         raise NotImplementedError
 
 
-class AbstractSyncBulkCreateRepository(ABC, Generic[T]):
+class AbstractSyncBulkCreateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def bulk_create(
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "list[T]":
+    ) -> "list[BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 
-class AbstractSyncUpdateRepository(ABC, Generic[T]):
+class AbstractSyncUpdateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def update(
         self,
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "list[T] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         raise NotImplementedError
 
 
-class AbstractSyncUpdateInstanceRepository(ABC, Generic[T]):
+class AbstractSyncUpdateInstanceRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     def update_instance(
         self,
         *,
-        instance: "T",
+        instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[bool, T]":
+    ) -> "tuple[bool, BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 
@@ -364,7 +360,7 @@ class AbstractSyncRepository(
     pass
 
 
-class AbstractAsyncGetRepository(ABC, Generic[T]):
+class AbstractAsyncGetRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def get(
         self,
@@ -372,7 +368,7 @@ class AbstractAsyncGetRepository(ABC, Generic[T]):
         filters: "Filters",
         joins: "Joins | None" = None,
         loads: "Loads | None" = None,
-    ) -> T | None:
+    ) -> BaseSQLAlchemyModel | None:
         raise NotImplementedError
 
 
@@ -397,7 +393,7 @@ class AbstractAsyncExistsRepository(ABC):
         raise NotImplementedError
 
 
-class AbstractAsyncListRepository(ABC, Generic[T]):
+class AbstractAsyncListRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def list(
         self,
@@ -410,49 +406,49 @@ class AbstractAsyncListRepository(ABC, Generic[T]):
         order_by: "OrderByParams | None" = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> "list[T]":
+    ) -> "list[BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 
-class AbstractAsyncCreateRepository(ABC, Generic[T]):
+class AbstractAsyncCreateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def create(
         self,
         *,
         data: "DataDict | None",
-    ) -> T:
+    ) -> BaseSQLAlchemyModel:
         raise NotImplementedError
 
 
-class AbstractAsyncBulkCreateRepository(ABC, Generic[T]):
+class AbstractAsyncBulkCreateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def bulk_create(
         self,
         *,
         data: "Sequence[DataDict]",
-    ) -> "list[T]":
+    ) -> "list[BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 
-class AbstractAsyncUpdateRepository(ABC, Generic[T]):
+class AbstractAsyncUpdateRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def update(
         self,
         *,
         data: "DataDict",
         filters: "Filters | None" = None,
-    ) -> "list[T] | None":
+    ) -> "list[BaseSQLAlchemyModel] | None":
         raise NotImplementedError
 
 
-class AbstractAsyncUpdateInstanceRepository(ABC, Generic[T]):
+class AbstractAsyncUpdateInstanceRepository(ABC, Generic[BaseSQLAlchemyModel]):
     @abstractmethod
     async def update_instance(
         self,
         *,
-        instance: "T",
+        instance: "BaseSQLAlchemyModel",
         data: "DataDict",
-    ) -> "tuple[bool, T]":
+    ) -> "tuple[bool, BaseSQLAlchemyModel]":
         raise NotImplementedError
 
 

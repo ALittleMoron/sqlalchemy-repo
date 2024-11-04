@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast, overload
 from dev_utils.common import get_utc_now
 from sqlalchemy import CursorResult, and_, delete, desc, exists, func, insert, or_, select, update
 from sqlalchemy import exc as sqlalchemy_exc
-from sqlalchemy.orm import DeclarativeBase as Base
 from sqlalchemy_dev_utils import (
     apply_joins,
     get_sqlalchemy_attribute,
@@ -25,6 +24,7 @@ from sqlrepo.logger import default_logger
 
 # noinspection PyUnresolvedReferences
 from sqlrepo.types import (
+    BaseSQLAlchemyModel,
     Count,
     DataDict,
     Deleted,
@@ -47,13 +47,13 @@ if TYPE_CHECKING:
 
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlalchemy.orm.attributes import InstrumentedAttribute, QueryableAttribute
+    from sqlalchemy.orm.decl_api import DeclarativeBase as Base
     from sqlalchemy.orm.session import Session
     from sqlalchemy.sql.dml import Delete, ReturningInsert, ReturningUpdate, Update
     from sqlalchemy.sql.elements import ColumnElement
     from sqlalchemy.sql.selectable import Select
 
 
-BaseSQLAlchemyModel = TypeVar("BaseSQLAlchemyModel", bound=Base)
 T = TypeVar("T")
 
 
